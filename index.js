@@ -50,18 +50,30 @@ const TRIGGERS = [
       .setColor(0xFFD700)
       .setDescription(
         `In June 2025, in the bustling world of Roblox, .davevc founded CityMart, a shopping experience like no other.  
-        It was deemed so special by Roblox it even received an automated “terrorism/extremism” flag led to a 7‑day ban!  
-        Fear not, CityMart will live on. Or so we hope 😅`
+        It was deemed so special by Roblox it even received an automated “terrorism/extremism” flag leading to a 7‑day ban!  
+        Fear not—CityMart will live on. Or so we hope 😅`
       )
       .addFields(
         { name: 'Founder', value: '.davevc', inline: true },
-        { name: 'Founded', value: 'July 2025', inline: true },
+        { name: 'Founded', value: 'June 2025', inline: true },
         { name: 'Ban Date', value: 'July 28, 2025', inline: true },
         { name: 'Reactivates', value: 'Aug 04, 2025, 02:36 AM GMT+2', inline: true },
-        { name: 'Vision', value: 'A shopping utopia on Roblox' }
+        { name: 'Vision', value: 'A shopping experience on Roblox' }
       )
       .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXU2d2JocTRqanB4eWQ5ZGJkNHh0djhhMWc0c3Vta2I5YXh2dnZjNCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YezX89ZyL4jvtJDtpQ/giphy.gif')
-      .setFooter({ text: 'CityMart Legends' })
+      .setFooter({ text: 'CityMart Lore' })
+      .setTimestamp()
+  },
+  {
+    keyword: 'lorebook',
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Lore Book')
+      .setColor(0x00AEFF)
+      .setDescription(
+        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book. Created and curated by Imbeane.`
+      )
+      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
+      .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
   }
 ];
