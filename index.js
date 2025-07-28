@@ -51,7 +51,7 @@ const TRIGGERS = [
       .setDescription(
         `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book. Created and curated by Imbeane.`
       )
-      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
+      .setURL('https://www.notion.so/citymart-lore-book-23eee5e2e2ec800db586cd84bf80cbf2?source=copy_link')
       .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
   },
