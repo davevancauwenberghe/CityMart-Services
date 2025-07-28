@@ -7,6 +7,7 @@ app = 'citymart-bot'
 primary_region = 'ams'
 
 [build]
+  dockerfile = "Dockerfile"
 
 [http_service]
   internal_port = 3000
