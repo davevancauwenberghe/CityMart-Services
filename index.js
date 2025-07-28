@@ -44,6 +44,18 @@ const TRIGGERS = [
       .setTimestamp()
   },
   {
+    keyword: 'lorebook',
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Lore Book')
+      .setColor(0x00AEFF)
+      .setDescription(
+        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book. Created and curated by Imbeane.`
+      )
+      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
+      .setFooter({ text: 'CityMart Lore' })
+      .setTimestamp()
+  },
+  {
     keyword: 'lore',
     embed: new EmbedBuilder()
       .setTitle('CityMart Lore & Ban Tale')
@@ -63,18 +75,6 @@ const TRIGGERS = [
       .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXU2d2JocTRqanB4eWQ5ZGJkNHh0djhhMWc0c3Vta2I5YXh2dnZjNCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YezX89ZyL4jvtJDtpQ/giphy.gif')
       .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
-  },
-  {
-    keyword: 'lorebook',
-    embed: new EmbedBuilder()
-      .setTitle('CityMart Lore Book')
-      .setColor(0x00AEFF)
-      .setDescription(
-        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book. Created and curated by Imbeane.`
-      )
-      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
-      .setFooter({ text: 'CityMart Lore' })
-      .setTimestamp()
   }
 ];
 
@@ -88,7 +88,9 @@ client.on('messageCreate', async message => {
 
   const content = message.content.toLowerCase();
   for (const trigger of TRIGGERS) {
-    if (content.includes(trigger.keyword)) {
+    // only match whole keywords to avoid overlaps (e.g. "lorebook" vs "lore")
+    const re = new RegExp(`\\b${trigger.keyword}\\b`);
+    if (re.test(content)) {
       const mention = `${message.author}`;
       await message.channel.send({ content: mention, embeds: [trigger.embed] });
       break;
