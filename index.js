@@ -50,9 +50,9 @@ const TRIGGERS = [
       .setTitle('CityMart Lore Book')
       .setColor(0x00AEFF)
       .setDescription(
-        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book.`
+        `Dive deeper into the history, secrets, and unprecedented lore of CityMart in our official Lore Book.`
       )
-      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
+      .setURL('https://nervous-flag-247.notion.site/23eee5e2e2ec800db586cd84bf80cbf2?v=23eee5e2e2ec804aa1b3000c2018e0b9')
       .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
   }
