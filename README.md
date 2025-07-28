@@ -1,4 +1,4 @@
-# CityMart Discord Bot
+# CityMart Services | Discord Bot
 
 ![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow.svg)  
 ![Docker](https://img.shields.io/badge/Container-Docker-blue.svg)  
