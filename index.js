@@ -12,6 +12,7 @@ const client = new Client({
 // Replace with your actual Support channel ID:
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 
+// Define your triggers
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -49,34 +50,28 @@ const TRIGGERS = [
       .setTitle('CityMart Lore Book')
       .setColor(0x00AEFF)
       .setDescription(
-        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book. Created and curated by Imbeane.`
+        `Dive deeper into the history, secrets, and behind‑the‑scenes stories of CityMart in our official Lore Book.`
       )
-      .setURL('https://www.notion.so/citymart-lore-book-23eee5e2e2ec800db586cd84bf80cbf2?source=copy_link')
-      .setFooter({ text: 'CityMart Lore' })
-      .setTimestamp()
-  },
-  {
-    keyword: 'lore',
-    embed: new EmbedBuilder()
-      .setTitle('CityMart Lore & Ban Tale')
-      .setColor(0xFFD700)
-      .setDescription(
-        `In June 2025, in the bustling world of Roblox, .davevc founded CityMart, a shopping experience like no other.  
-        It was deemed so special by Roblox it even received an automated “terrorism/extremism” flag leading to a 7‑day ban!  
-        Fear not—CityMart will live on. Or so we hope 😅`
-      )
-      .addFields(
-        { name: 'Founder', value: '.davevc', inline: true },
-        { name: 'Founded', value: 'June 2025', inline: true },
-        { name: 'Ban Date', value: 'July 28, 2025', inline: true },
-        { name: 'Reactivates', value: 'Aug 04, 2025, 02:36 AM GMT+2', inline: true },
-        { name: 'Vision', value: 'A shopping experience on Roblox' }
-      )
-      .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXU2d2JocTRqanB4eWQ5ZGJkNHh0djhhMWc0c3Vta2I5YXh2dnZjNCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YezX89ZyL4jvtJDtpQ/giphy.gif')
+      .setURL('https://discord.com/channels/1385065664892633098/1385065666637201462/1399209359560675398')
       .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
   }
 ];
+
+// Default help embed when no keyword is matched
+const HELP_EMBED = new EmbedBuilder()
+  .setTitle('Hello from CityMart Services!')
+  .setDescription(
+    `I’m here to help you with the following commands:\n\n` +
+    `• **community** – Get the Roblox Community link\n` +
+    `• **experience** – Check out our CityMart Shopping Experience\n` +
+    `• **support** – Find out how to get help\n` +
+    `• **lorebook** – Read our detailed Lore Book\n\n` +
+    `Usage: \`@CityMart Services <keyword>\``
+  )
+  .setColor(0x00FFAA)
+  .setFooter({ text: 'Need anything else? Just ping me!' })
+  .setTimestamp();
 
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
@@ -87,14 +82,24 @@ client.on('messageCreate', async message => {
   if (!message.mentions.has(client.user)) return;
 
   const content = message.content.toLowerCase();
+  let handled = false;
+
   for (const trigger of TRIGGERS) {
-    // only match whole keywords to avoid overlaps (e.g. "lorebook" vs "lore")
     const re = new RegExp(`\\b${trigger.keyword}\\b`);
     if (re.test(content)) {
       const mention = `${message.author}`;
       await message.channel.send({ content: mention, embeds: [trigger.embed] });
+      handled = true;
       break;
     }
+  }
+
+  if (!handled) {
+    // No keyword matched; send help overview
+    await message.channel.send({
+      content: `${message.author}`,
+      embeds: [HELP_EMBED]
+    });
   }
 });
 
