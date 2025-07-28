@@ -42,6 +42,27 @@ const TRIGGERS = [
       )
       .setColor(0xff9900)
       .setTimestamp()
+  },
+  {
+    keyword: 'lore',
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Lore & Ban Tale')
+      .setColor(0xFFD700)
+      .setDescription(
+        `In June 2025, in the bustling world of Roblox, .davevc founded CityMart, a shopping experience like no other.  
+        It was deemed so special by Roblox it even received an automated “terrorism/extremism” flag led to a 7‑day ban!  
+        Fear not, CityMart will live on. Or so we hope 😅`
+      )
+      .addFields(
+        { name: 'Founder', value: '.davevc', inline: true },
+        { name: 'Founded', value: 'July 2025', inline: true },
+        { name: 'Ban Date', value: 'July 28, 2025', inline: true },
+        { name: 'Reactivates', value: 'Aug 04, 2025, 02:36 AM GMT+2', inline: true },
+        { name: 'Vision', value: 'A shopping utopia on Roblox' }
+      )
+      .setImage('https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdXU2d2JocTRqanB4eWQ5ZGJkNHh0djhhMWc0c3Vta2I5YXh2dnZjNCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YezX89ZyL4jvtJDtpQ/giphy.gif')
+      .setFooter({ text: 'CityMart Legends' })
+      .setTimestamp()
   }
 ];
 
