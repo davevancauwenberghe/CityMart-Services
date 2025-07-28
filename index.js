@@ -10,27 +10,38 @@ const client = new Client({
 });
 
 // Replace with your actual Support channel ID:
-const SUPPORT_CHANNEL_ID = 'YOUR_SUPPORT_CHANNEL_ID';
+const SUPPORT_CHANNEL_ID = '1385699550005694586';
 
 const TRIGGERS = [
   {
     keyword: 'community',
     embed: new EmbedBuilder()
       .setTitle('CityMart Community')
-      .setDescription('✅ Roblox Community')
+      .setDescription(
+        `Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up‑to‑date on all our events.`
+      )
       .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
+      .setTimestamp()
   },
   {
     keyword: 'experience',
     embed: new EmbedBuilder()
       .setTitle('CityMart Shopping Experience')
-      .setDescription('🎮 Jump in now!')
+      .setDescription(
+        `Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!`
+      )
       .setURL('https://www.roblox.com/games/84931510725955/CityMart-Shopping')
+      .setTimestamp()
   },
   {
     keyword: 'support',
-    text: user =>
-      `${user} For support, please head over to <#${SUPPORT_CHANNEL_ID}>.`
+    embed: new EmbedBuilder()
+      .setTitle('Need Help?')
+      .setDescription(
+        `If you’re stuck or have questions, head over to <#${SUPPORT_CHANNEL_ID}> and one of our moderators will be happy to assist!`
+      )
+      .setColor(0xff9900)
+      .setTimestamp()
   }
 ];
 
@@ -46,11 +57,7 @@ client.on('messageCreate', async message => {
   for (const trigger of TRIGGERS) {
     if (content.includes(trigger.keyword)) {
       const mention = `${message.author}`;
-      if (trigger.embed) {
-        await message.channel.send({ content: mention, embeds: [trigger.embed] });
-      } else {
-        await message.channel.send(trigger.text(mention));
-      }
+      await message.channel.send({ content: mention, embeds: [trigger.embed] });
       break;
     }
   }
