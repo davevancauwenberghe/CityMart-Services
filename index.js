@@ -12,7 +12,7 @@ const client = new Client({
 // Replace with your actual Support channel ID:
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 
-// Define your triggers
+// Define your mention‑based triggers
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -77,6 +77,7 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
+// Handle mention‑based keyword replies
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
   if (!message.mentions.has(client.user)) return;
@@ -87,8 +88,10 @@ client.on('messageCreate', async message => {
   for (const trigger of TRIGGERS) {
     const re = new RegExp(`\\b${trigger.keyword}\\b`);
     if (re.test(content)) {
-      const mention = `${message.author}`;
-      await message.channel.send({ content: mention, embeds: [trigger.embed] });
+      await message.channel.send({
+        content: `${message.author}`,
+        embeds: [trigger.embed]
+      });
       handled = true;
       break;
     }
@@ -99,6 +102,33 @@ client.on('messageCreate', async message => {
     await message.channel.send({
       content: `${message.author}`,
       embeds: [HELP_EMBED]
+    });
+  }
+});
+
+// ─── Slash‐Command Handler ────────────────────────────────────────────────
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+
+  const { commandName, user } = interaction;
+
+  if (commandName === 'keywords') {
+    // List available keywords (ephemeral)
+    await interaction.reply({
+      content:
+        `Hi ${user}! You can use these keywords with @CityMart Services:\n` +
+        `• community\n` +
+        `• experience\n` +
+        `• support\n` +
+        `• lorebook`,
+      ephemeral: true
+    });
+
+  } else if (commandName === 'support') {
+    // Direct users to the support channel
+    await interaction.reply({
+      content: `For support, please head over to <#${SUPPORT_CHANNEL_ID}>.`,
+      ephemeral: false
     });
   }
 });
