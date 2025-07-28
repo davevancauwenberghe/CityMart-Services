@@ -12,12 +12,16 @@ const client = new Client({
 // Replace with your actual Support channel ID:
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 
+// Thumbnail URL for embeds
+const THUMBNAIL_URL = 'https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png';
+
 // Define your mention‑based triggers
 const TRIGGERS = [
   {
     keyword: 'community',
     embed: new EmbedBuilder()
       .setTitle('CityMart Community')
+      .setThumbnail(THUMBNAIL_URL)
       .setDescription(
         `Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up‑to‑date on all our events.`
       )
@@ -28,6 +32,7 @@ const TRIGGERS = [
     keyword: 'experience',
     embed: new EmbedBuilder()
       .setTitle('CityMart Shopping Experience')
+      .setThumbnail(THUMBNAIL_URL)
       .setDescription(
         `Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!`
       )
@@ -38,6 +43,7 @@ const TRIGGERS = [
     keyword: 'support',
     embed: new EmbedBuilder()
       .setTitle('Need Help?')
+      .setThumbnail(THUMBNAIL_URL)
       .setDescription(
         `If you’re stuck or have questions, head over to <#${SUPPORT_CHANNEL_ID}> and one of our moderators will be happy to assist!`
       )
@@ -48,6 +54,7 @@ const TRIGGERS = [
     keyword: 'lorebook',
     embed: new EmbedBuilder()
       .setTitle('CityMart Lore Book')
+      .setThumbnail(THUMBNAIL_URL)
       .setColor(0x00AEFF)
       .setDescription(
         `Dive deeper into the history, secrets, and unprecedented lore of CityMart in our official Lore Book.`
@@ -58,19 +65,17 @@ const TRIGGERS = [
   }
 ];
 
-// Default help embed when no keyword is matched
+// Help embed when no keyword is matched
 const HELP_EMBED = new EmbedBuilder()
-  .setTitle('Hello from CityMart Services!')
-  .setDescription(
-    `I’m here to help you with the following commands:\n\n` +
-    `• **community** – Get the Roblox Community link\n` +
-    `• **experience** – Check out our CityMart Shopping Experience\n` +
-    `• **support** – Find out how to get help\n` +
-    `• **lorebook** – Read our detailed Lore Book\n\n` +
-    `Usage: \`@CityMart Services <keyword>\``
-  )
+  .setTitle('CityMart Services Help')
+  .setThumbnail(THUMBNAIL_URL)
   .setColor(0x00FFAA)
-  .setFooter({ text: 'Need anything else? Just ping me!' })
+  .addFields(
+    { name: '🔗 Roblox Links', value: '• **community**\n• **experience**' },
+    { name: '🆘 Support',        value: '• **support**' },
+    { name: '📖 Misc',           value: '• **lorebook**' }
+  )
+  .setFooter({ text: 'Use @CityMart Services <keyword> to invoke a command' })
   .setTimestamp();
 
 client.once('ready', () => {
@@ -98,7 +103,7 @@ client.on('messageCreate', async message => {
   }
 
   if (!handled) {
-    // No keyword matched; send help overview
+    // No keyword matched; send categorized help overview
     await message.channel.send({
       content: `${message.author}`,
       embeds: [HELP_EMBED]
@@ -113,21 +118,17 @@ client.on('interactionCreate', async interaction => {
   const { commandName, user } = interaction;
 
   if (commandName === 'keywords') {
-    // List available keywords (ephemeral)
+    // Send the same categorized help embed, ephemeral
     await interaction.reply({
-      content:
-        `Hi ${user}! You can use these keywords with @CityMart Services:\n` +
-        `• community\n` +
-        `• experience\n` +
-        `• support\n` +
-        `• lorebook`,
+      embeds: [HELP_EMBED],
       ephemeral: true
     });
 
   } else if (commandName === 'support') {
-    // Direct users to the support channel
+    // Reuse the support embed so it remains consistent
+    const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
     await interaction.reply({
-      content: `For support, please head over to <#${SUPPORT_CHANNEL_ID}>.`,
+      embeds: [supportEmbed],
       ephemeral: false
     });
   }
