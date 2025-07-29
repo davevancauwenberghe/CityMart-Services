@@ -1,4 +1,3 @@
-// index.js
 require('dotenv').config();
 const { 
   Client, 
@@ -8,6 +7,9 @@ const {
   ButtonBuilder,
   ButtonStyle
 } = require('discord.js');
+const http = require('http');
+const fs   = require('fs');
+const path = require('path');
 
 const client = new Client({
   intents: [
@@ -17,23 +19,17 @@ const client = new Client({
   ]
 });
 
-// Replace with your actual Support channel ID & your Guild ID:
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const GUILD_ID = process.env.GUILD_ID;
-
-// Thumbnail URL for embeds
 const THUMBNAIL_URL = 'https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png';
 
-// Define your mention‑based triggers (excluding 'lamp')
 const TRIGGERS = [
   {
     keyword: 'community',
     embed: new EmbedBuilder()
       .setTitle('CityMart Community')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        `Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up‑to‑date on all our events.`
-      )
+      .setDescription('Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up‑to‑date on all our events.')
       .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
       .setTimestamp()
   },
@@ -42,9 +38,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Shopping Experience')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        `Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!`
-      )
+      .setDescription('Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!')
       .setURL('https://www.roblox.com/games/84931510725955/CityMart-Shopping')
       .setTimestamp()
   },
@@ -53,9 +47,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('Need Help?')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        `If you’re stuck or have questions, click the button below to jump to our support channel!`
-      )
+      .setDescription('If you’re stuck or have questions, click the button below to jump to our support channel!')
       .setColor(0xff9900)
       .setTimestamp()
   },
@@ -65,30 +57,22 @@ const TRIGGERS = [
       .setTitle('CityMart Lore Book')
       .setThumbnail(THUMBNAIL_URL)
       .setColor(0x00AEFF)
-      .setDescription(
-        `Dive deeper into the history, secrets, and unprecedented lore of CityMart in our official Lore Book.`
-      )
+      .setDescription('Dive deeper into the history, secrets, and unprecedented lore of CityMart in our official Lore Book.')
       .setURL('https://nervous-flag-247.notion.site/23eee5e2e2ec800db586cd84bf80cbf2?v=23eee5e2e2ec804aa1b3000c2018e0b9')
       .setFooter({ text: 'CityMart Lore' })
       .setTimestamp()
   },
   {
-    // "lamp" will be handled globally (no mention needed)
     keyword: 'lamp',
     embed: new EmbedBuilder()
       .setTitle('About the Lamp')
       .setColor(0xFFD700)
-      .setDescription(
-        `💡 We don't talk about the lamp. The lamp doesn't exist.\n\n` +
-        `Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, ` +
-        `no one dares mention it again. Handle with caution!`
-      )
+      .setDescription('💡 We don\'t talk about the lamp. The lamp doesn\'t exist.\n\nEver since that malicious lamp script from the Roblox toolbox infiltrated CityMart, no one dares mention it again. Handle with caution!')
       .setFooter({ text: 'Shh... the lamp is gone' })
       .setTimestamp()
   }
 ];
 
-// Help embed when no keyword is matched
 const HELP_EMBED = new EmbedBuilder()
   .setTitle('CityMart Services Help')
   .setThumbnail(THUMBNAIL_URL)
@@ -105,27 +89,25 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// Handle mention‑based keyword replies
+// Mention‑based keyword handling
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
-
   const msg = message.content.toLowerCase();
 
-  // 1) Handle "lamp" anytime, no mention required
+  // lamp always fires
   if (/\blamp\b/.test(msg)) {
     const lampEmbed = TRIGGERS.find(t => t.keyword === 'lamp').embed;
     return message.channel.send({ content: `${message.author}`, embeds: [lampEmbed] });
   }
 
-  // 2) All other keywords still require @CityMart Services ping
+  // others require mention
   if (!message.mentions.has(client.user)) return;
 
   let handled = false;
   for (const trigger of TRIGGERS) {
-    if (trigger.keyword === 'lamp') continue; // already handled
+    if (trigger.keyword === 'lamp') continue;
     const re = new RegExp(`\\b${trigger.keyword}\\b`);
     if (re.test(msg)) {
-      // build support button if keyword is 'support'
       let components = [];
       if (trigger.keyword === 'support') {
         const supportBtn = new ButtonBuilder()
@@ -146,29 +128,19 @@ client.on('messageCreate', async message => {
   }
 
   if (!handled) {
-    // No keyword matched; send categorized help overview
-    await message.channel.send({
-      content: `${message.author}`,
-      embeds: [HELP_EMBED]
-    });
+    await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
   }
 });
 
-// ─── Slash‑Command Handler ────────────────────────────────────────────────
+// Slash command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
-
   const { commandName, createdTimestamp } = interaction;
 
   if (commandName === 'keywords') {
-    // Send the same categorized help embed, ephemeral
-    await interaction.reply({
-      embeds: [HELP_EMBED],
-      ephemeral: true
-    });
+    await interaction.reply({ embeds: [HELP_EMBED], ephemeral: true });
 
   } else if (commandName === 'support') {
-    // Reuse the support embed + button
     const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
     const supportBtn = new ButtonBuilder()
       .setLabel('Go to Support')
@@ -176,14 +148,9 @@ client.on('interactionCreate', async interaction => {
       .setStyle(ButtonStyle.Link)
       .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
     const row = new ActionRowBuilder().addComponents(supportBtn);
-    await interaction.reply({
-      embeds: [supportEmbed],
-      components: [row],
-      ephemeral: false
-    });
+    await interaction.reply({ embeds: [supportEmbed], components: [row], ephemeral: false });
 
   } else if (commandName === 'ping') {
-    // Ping‑pong with fun embed (public)
     const latency = Date.now() - createdTimestamp;
     const pingEmbed = new EmbedBuilder()
       .setTitle('🏓 Pong!')
@@ -192,30 +159,24 @@ client.on('interactionCreate', async interaction => {
       .setColor(0x00FFAA)
       .setFooter({ text: 'CityMart Services' })
       .setTimestamp();
-    // Show in channel (public)
     await interaction.reply({ embeds: [pingEmbed], ephemeral: false });
   }
 });
 
 client.login(process.env.DISCORD_TOKEN);
 
-const http = require('http');
+// Simple HTTP server for landing page
 const PORT = process.env.PORT || 3000;
-
 http.createServer((req, res) => {
-  // You can either inline HTML…
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
-  res.end(`
-    <html>
-     <head><title>CityMart Services</title></head>
-     <body style="font-family:sans-serif; text-align:center; padding:2rem;">
-       <img src="${THUMBNAIL_URL}" alt="CityMart" width="128" /><h1>CityMart Services Bot</h1>
-       <p>Your friendly Discord helper for CityMart Group.</p>
-       <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
-     </body>
-    </html>
-  `);
+  const filePath = path.join(__dirname, 'public', 'index.html');
+  fs.readFile(filePath, (err, html) => {
+    if (err) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      return res.end('Error loading page');
+    }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
+    res.end(html);
+  });
 }).listen(PORT, () => {
   console.log(`🌐 HTTP server listening on port ${PORT}`);
 });
-
