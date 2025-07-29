@@ -8,7 +8,10 @@ const commands = [
     .setDescription('View what keywords you can use with CityMart Services'),
   new SlashCommandBuilder()
     .setName('support')
-    .setDescription('Get help and support information')
+    .setDescription('Get help and support information'),
+  new SlashCommandBuilder()
+    .setName('ping')
+    .setDescription('Check the bot latency'),
 ].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
