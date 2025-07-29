@@ -166,7 +166,7 @@ client.on('interactionCreate', async interaction => {
 client.login(process.env.DISCORD_TOKEN);
 
 // Simple HTTP server for landing page
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
   const filePath = path.join(__dirname, 'public', 'index.html');
   fs.readFile(filePath, (err, html) => {
@@ -177,6 +177,6 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
     res.end(html);
   });
-}).listen(PORT, () => {
-  console.log(`🌐 HTTP server listening on port ${PORT}`);
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 HTTP server listening on 0.0.0.0:${PORT}`);
 });
