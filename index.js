@@ -1,6 +1,14 @@
 // index.js
 require('dotenv').config();
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { 
+  Client, 
+  GatewayIntentBits, 
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
+} = require('discord.js');
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -9,8 +17,9 @@ const client = new Client({
   ]
 });
 
-// Replace with your actual Support channel ID:
+// Replace with your actual Support channel ID & your Guild ID:
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
+const GUILD_ID = process.env.GUILD_ID;
 
 // Thumbnail URL for embeds
 const THUMBNAIL_URL = 'https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png';
@@ -45,7 +54,7 @@ const TRIGGERS = [
       .setTitle('Need Help?')
       .setThumbnail(THUMBNAIL_URL)
       .setDescription(
-        `If you’re stuck or have questions, head over to <#${SUPPORT_CHANNEL_ID}> and one of our moderators will be happy to assist!`
+        `If you’re stuck or have questions, click the button below to jump to our support channel!`
       )
       .setColor(0xff9900)
       .setTimestamp()
@@ -96,6 +105,7 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
+// Handle mention‑based keyword replies
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
 
@@ -115,9 +125,20 @@ client.on('messageCreate', async message => {
     if (trigger.keyword === 'lamp') continue; // already handled
     const re = new RegExp(`\\b${trigger.keyword}\\b`);
     if (re.test(msg)) {
+      // build support button if keyword is 'support'
+      let components = [];
+      if (trigger.keyword === 'support') {
+        const supportBtn = new ButtonBuilder()
+          .setLabel('Go to Support')
+          .setEmoji('❓')
+          .setStyle(ButtonStyle.Link)
+          .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
+        components = [ new ActionRowBuilder().addComponents(supportBtn) ];
+      }
       await message.channel.send({
         content: `${message.author}`,
-        embeds: [trigger.embed]
+        embeds: [trigger.embed],
+        components
       });
       handled = true;
       break;
@@ -137,7 +158,7 @@ client.on('messageCreate', async message => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
 
-  const { commandName } = interaction;
+  const { commandName, createdTimestamp } = interaction;
 
   if (commandName === 'keywords') {
     // Send the same categorized help embed, ephemeral
@@ -147,12 +168,31 @@ client.on('interactionCreate', async interaction => {
     });
 
   } else if (commandName === 'support') {
-    // Reuse the support embed so it remains consistent
+    // Reuse the support embed + button
     const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
+    const supportBtn = new ButtonBuilder()
+      .setLabel('Go to Support')
+      .setEmoji('❓')
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
+    const row = new ActionRowBuilder().addComponents(supportBtn);
     await interaction.reply({
       embeds: [supportEmbed],
+      components: [row],
       ephemeral: false
     });
+
+  } else if (commandName === 'ping') {
+    // Ping‑pong with fun embed
+    const latency = Date.now() - createdTimestamp;
+    const pingEmbed = new EmbedBuilder()
+      .setTitle('🏓 Pong!')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription(`Latency is **${latency}ms**`)
+      .setColor(0x00FFAA)
+      .setFooter({ text: 'CityMart Services' })
+      .setTimestamp();
+    await interaction.reply({ embeds: [pingEmbed], ephemeral: true });
   }
 });
 
