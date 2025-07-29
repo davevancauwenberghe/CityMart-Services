@@ -2,17 +2,83 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CityMart Services Bot</title>
   <style>
-    body { font-family:sans-serif; text-align:center; padding:2rem; }
-    img { max-width:128px; }
+    /* Reset & base */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #222327;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    #container {
+      text-align: center;
+    }
+
+    /* Logo animation */
+    #logo {
+      width: 128px;
+      animation: logoMoveUp 1s ease-out forwards;
+      animation-delay: 0.5s;
+    }
+
+    @keyframes logoMoveUp {
+      0%   { transform: translateY(0); }
+      100% { transform: translateY(-20vh); }
+    }
+
+    /* Content fade‑in */
+    #content {
+      opacity: 0;
+      animation: fadeIn 1s ease-in forwards;
+      animation-delay: 1.5s;
+      margin-top: 1rem;
+    }
+
+    @keyframes fadeIn {
+      0%   { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      font-size: 1rem;
+      line-height: 1.5;
+      margin: 0.5rem 0;
+    }
+
+    code {
+      background: rgba(255,255,255,0.1);
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
-  <img src="https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png?ex=688a04c0&is=6888b340&hm=e70b2787dd168f1ba1a8c266f0c5ba251d3111f791c49a5ade5a558e10274988&"
-       alt="CityMart Logo" />
-  <h1>CityMart Services Bot</h1>
-  <p>Your friendly Discord helper for the CityMart Group.</p>
-  <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+  <div id="container">
+    <img
+      id="logo"
+      src="https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png?ex=688a04c0&is=6888b340&hm=e70b2787dd168f1ba1a8c266f0c5ba251d3111f791c49a5ade5a558e10274988&"
+      alt="CityMart Logo"
+    />
+    <div id="content">
+      <h1>CityMart Services Bot</h1>
+      <p>Your friendly Discord helper for the CityMart Group.</p>
+      <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+    </div>
+  </div>
 </body>
 </html>
