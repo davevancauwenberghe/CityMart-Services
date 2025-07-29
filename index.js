@@ -198,3 +198,24 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  // You can either inline HTML…
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
+  res.end(`
+    <html>
+     <head><title>CityMart Services</title></head>
+     <body style="font-family:sans-serif; text-align:center; padding:2rem;">
+       <img src="${THUMBNAIL_URL}" alt="CityMart" width="128" /><h1>CityMart Services Bot</h1>
+       <p>Your friendly Discord helper for CityMart Group.</p>
+       <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+     </body>
+    </html>
+  `);
+}).listen(PORT, () => {
+  console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
+
