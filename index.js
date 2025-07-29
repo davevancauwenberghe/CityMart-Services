@@ -1,3 +1,4 @@
+```js
 // index.js
 require('dotenv').config();
 const { 
@@ -183,7 +184,7 @@ client.on('interactionCreate', async interaction => {
     });
 
   } else if (commandName === 'ping') {
-    // Ping‑pong with fun embed
+    // Ping‑pong with fun embed (public)
     const latency = Date.now() - createdTimestamp;
     const pingEmbed = new EmbedBuilder()
       .setTitle('🏓 Pong!')
@@ -192,7 +193,8 @@ client.on('interactionCreate', async interaction => {
       .setColor(0x00FFAA)
       .setFooter({ text: 'CityMart Services' })
       .setTimestamp();
-    await interaction.reply({ embeds: [pingEmbed], ephemeral: true });
+    // Show in channel (public)
+    await interaction.reply({ embeds: [pingEmbed], ephemeral: false });
   }
 });
 
