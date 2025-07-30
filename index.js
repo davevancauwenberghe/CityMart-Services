@@ -22,7 +22,7 @@ const client = new Client({
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const GUILD_ID = process.env.GUILD_ID;
 const BOT_URL = 'https://citymart-bot.fly.dev/';
-const THUMBNAIL_URL = 'https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png';
+const THUMBNAIL_URL = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
 
 const TRIGGERS = [
   {
