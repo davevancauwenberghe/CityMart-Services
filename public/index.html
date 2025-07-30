@@ -13,14 +13,20 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #222327;
+      background-color: #38a34a;
       color: #ffffff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
     }
 
     #container {
+      background-color: #222327;
+      border-radius: 32px;
+      padding: 2rem;
+      max-width: 360px;
+      width: 90%;
       text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
 
     /* Logo animation */
@@ -32,7 +38,7 @@
 
     @keyframes logoMoveUp {
       0%   { transform: translateY(0); }
-      100% { transform: translateY(-20vh); }
+      100% { transform: translateY(-10vh); }
     }
 
     /* Content fade‑in */
@@ -49,7 +55,7 @@
     }
 
     h1 {
-      font-size: 2rem;
+      font-size: 1.75rem;
       margin-bottom: 0.5rem;
     }
 
@@ -65,20 +71,38 @@
       border-radius: 4px;
       font-family: monospace;
     }
+
+    /* GitHub button spacing */
+    #github-star {
+      margin-top: 1.5rem;
+    }
   </style>
 </head>
 <body>
   <div id="container">
     <img
       id="logo"
-      src="https://cdn.discordapp.com/attachments/1399537105973018744/1399803517325017088/CityMart_Group_Icon.png?ex=688a541d&is=6889029d&hm=ab10b9241747dd7166b0f1b29b20472adff110e784a3c33b01d1526695c7018b&"
+      src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png"
       alt="CityMart Logo"
     />
     <div id="content">
       <h1>CityMart Services Bot</h1>
       <p>Your friendly Discord helper for the CityMart Group.</p>
       <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+      <div id="github-star">
+        <!-- GitHub Star button -->
+        <a class="github-button"
+           href="https://github.com/davevancauwenberghe/CityMart-Services"
+           data-color-scheme="no-preference: light; light: light; dark: dark;"
+           data-icon="octicon-star"
+           data-size="large"
+           data-show-count="true"
+           aria-label="Star davevancauwenberghe/CityMart-Services on GitHub">
+          Star
+        </a>
+      </div>
     </div>
   </div>
+  <script async defer src="https://buttons.github.io/buttons.js"></script>
 </body>
 </html>
