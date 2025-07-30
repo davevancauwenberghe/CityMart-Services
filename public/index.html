@@ -27,31 +27,47 @@
       width: 90%;
       text-align: center;
       box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      position: relative;
+    }
+
+    /* Spinner */
+    #spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     /* Logo animation */
     #logo {
       width: 128px;
+      opacity: 0;
+      transform: translateY(0);
       animation: logoMoveUp 1s ease-out forwards;
-      animation-delay: 0.5s;
+      animation-delay: 0;
     }
-
     @keyframes logoMoveUp {
-      0%   { transform: translateY(0); }
-      100% { transform: translateY(-10vh); }
+      to {
+        opacity: 1;
+        transform: translateY(-10vh);
+      }
     }
 
     /* Content fade‑in */
     #content {
       opacity: 0;
       animation: fadeIn 1s ease-in forwards;
-      animation-delay: 1.5s;
+      animation-delay: 0;
       margin-top: 1rem;
     }
-
     @keyframes fadeIn {
-      0%   { opacity: 0; }
-      100% { opacity: 1; }
+      to { opacity: 1; }
     }
 
     h1 {
@@ -80,6 +96,10 @@
 </head>
 <body>
   <div id="container">
+    <!-- initial spinner -->
+    <div id="spinner"></div>
+
+    <!-- logo and content hidden until spinner done -->
     <img
       id="logo"
       src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png"
@@ -89,6 +109,7 @@
       <h1>CityMart Services Bot</h1>
       <p>Your friendly Discord helper for the CityMart Group.</p>
       <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+      <p>Status: 🟢 Online</p>
       <div id="github-star">
         <!-- GitHub Star button -->
         <a class="github-button"
@@ -103,6 +124,20 @@
       </div>
     </div>
   </div>
+
   <script async defer src="https://buttons.github.io/buttons.js"></script>
+  <script>
+    // after 2s remove spinner, start animations
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        document.getElementById('spinner').style.display = 'none';
+        const logo = document.getElementById('logo');
+        const content = document.getElementById('content');
+        // trigger animations
+        logo.style.animationDelay = '0s';
+        content.style.animationDelay = '0s';
+      }, 2000);
+    });
+  </script>
 </body>
 </html>
