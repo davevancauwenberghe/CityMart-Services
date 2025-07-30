@@ -21,6 +21,7 @@ const client = new Client({
 
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const GUILD_ID = process.env.GUILD_ID;
+const BOT_URL = 'https://citymart-bot.fly.dev/';
 const THUMBNAIL_URL = 'https://cdn.discordapp.com/attachments/1399537105973018744/1399537106183000104/CityMart_Group_Discord_Transparent.png';
 
 const TRIGGERS = [
@@ -67,7 +68,11 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('About the Lamp')
       .setColor(0xFFD700)
-      .setDescription('💡 We don\'t talk about the lamp. The lamp doesn\'t exist.\n\nEver since that malicious lamp script from the Roblox toolbox infiltrated CityMart, no one dares mention it again. Handle with caution!')
+      .setDescription(
+        '💡 We don\'t talk about the lamp. The lamp doesn\'t exist.\n\n' +
+        'Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, ' +
+        'no one dares mention it again. Handle with caution!'
+      )
       .setFooter({ text: 'Shh... the lamp is gone' })
       .setTimestamp()
   }
@@ -77,12 +82,17 @@ const HELP_EMBED = new EmbedBuilder()
   .setTitle('CityMart Services Help')
   .setThumbnail(THUMBNAIL_URL)
   .setColor(0x00FFAA)
-  .addFields(
-    { name: '🔗 Roblox Links', value: '• community\n• experience' },
-    { name: '\u200B',          value: '\u200B' },
-    { name: '🆘 Support',      value: '• support' },
-    { name: '\u200B',          value: '\u200B' },
-    { name: '📖 Misc',         value: '• lorebook\n• lamp\n• ping' }
+  .setDescription(
+    '🔗 Roblox Links\n' +
+    '• community\n' +
+    '• experience\n\n' +
+    '🆘 Support\n' +
+    '• support\n\n' +
+    '📖 Misc\n' +
+    '• lorebook\n' +
+    '• lamp\n' +
+    '• ping\n\n' +
+    `🔗 [Bot Dashboard](${BOT_URL})`
   )
   .setFooter({ text: 'Use @CityMart Services <keyword> to invoke a command' })
   .setTimestamp();
@@ -91,20 +101,37 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
+// Mention‑based handling
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
   const msg = message.content.toLowerCase();
 
-  // lamp always fires
+  // lamp always fires, no mention needed
   if (/\blamp\b/.test(msg)) {
     const lampEmbed = TRIGGERS.find(t => t.keyword === 'lamp').embed;
     return message.channel.send({ content: `${message.author}`, embeds: [lampEmbed] });
   }
 
-  // others require mention
+  // all others require a mention
   if (!message.mentions.has(client.user)) return;
 
-  let handled = false;
+  // ping as mention‑based command
+  if (/\bping\b/.test(msg)) {
+    const latency = Date.now() - message.createdTimestamp;
+    const pingEmbed = new EmbedBuilder()
+      .setTitle('🏓 Pong!')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription(
+        `Latency is **${latency}ms**\n\n` +
+        `🔗 [Bot Dashboard](${BOT_URL})`
+      )
+      .setColor(0x00FFAA)
+      .setFooter({ text: 'CityMart Services' })
+      .setTimestamp();
+    return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
+  }
+
+  // other keyword triggers
   for (const trigger of TRIGGERS) {
     if (trigger.keyword === 'lamp') continue;
     const re = new RegExp(`\\b${trigger.keyword}\\b`);
@@ -118,27 +145,24 @@ client.on('messageCreate', async message => {
           .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
         components = [ new ActionRowBuilder().addComponents(supportBtn) ];
       }
-      await message.channel.send({
+      return message.channel.send({
         content: `${message.author}`,
         embeds: [trigger.embed],
         components
       });
-      handled = true;
-      break;
     }
   }
 
-  if (!handled) {
-    await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
-  }
+  // fallback: help embed
+  await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
 });
 
+// Slash‑command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
   const { commandName, createdTimestamp } = interaction;
 
   if (commandName === 'keywords') {
-    // show help embed publicly
     await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
 
   } else if (commandName === 'support') {
@@ -156,7 +180,10 @@ client.on('interactionCreate', async interaction => {
     const pingEmbed = new EmbedBuilder()
       .setTitle('🏓 Pong!')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription(`Latency is **${latency}ms**`)
+      .setDescription(
+        `Latency is **${latency}ms**\n\n` +
+        `🔗 [Bot Dashboard](${BOT_URL})`
+      )
       .setColor(0x00FFAA)
       .setFooter({ text: 'CityMart Services' })
       .setTimestamp();
@@ -166,7 +193,6 @@ client.on('interactionCreate', async interaction => {
 
 client.login(process.env.DISCORD_TOKEN);
 
-// Simple HTTP server for landing page
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
   const filePath = path.join(__dirname, 'public', 'index.html');
@@ -179,5 +205,5 @@ http.createServer((req, res) => {
     res.end(html);
   });
 }).listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 HTTP server listening on 0.0.0.0:${PORT}`);
+  console.log(`🌐 HTTP server listening on port ${PORT}`);
 });
