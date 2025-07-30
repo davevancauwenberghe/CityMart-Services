@@ -78,9 +78,11 @@ const HELP_EMBED = new EmbedBuilder()
   .setThumbnail(THUMBNAIL_URL)
   .setColor(0x00FFAA)
   .addFields(
-    { name: '🔗 Roblox Links', value: '• **community**\n• **experience**' },
-    { name: '🆘 Support',        value: '• **support**' },
-    { name: '📖 Misc',           value: '• **lorebook**\n• **lamp**' }
+    { name: '🔗 Roblox Links', value: '• community\n• experience' },
+    { name: '\u200B',          value: '\u200B' },
+    { name: '🆘 Support',      value: '• support' },
+    { name: '\u200B',          value: '\u200B' },
+    { name: '📖 Misc',         value: '• lorebook\n• lamp\n• ping' }
   )
   .setFooter({ text: 'Use @CityMart Services <keyword> to invoke a command' })
   .setTimestamp();
@@ -89,7 +91,6 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// Mention‑based keyword handling
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
   const msg = message.content.toLowerCase();
@@ -132,13 +133,13 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Slash command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
   const { commandName, createdTimestamp } = interaction;
 
   if (commandName === 'keywords') {
-    await interaction.reply({ embeds: [HELP_EMBED], ephemeral: true });
+    // show help embed publicly
+    await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
 
   } else if (commandName === 'support') {
     const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
