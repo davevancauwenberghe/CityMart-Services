@@ -14,7 +14,7 @@ const commands = [
     .setDescription('Check the bot latency'),
   new SlashCommandBuilder()
     .setName('community')
-    .setDescription('Get the Roblox Community link'),
+    .setDescription('Get the CityMart Group Roblox Community link'),
   new SlashCommandBuilder()
     .setName('experience')
     .setDescription('Get the CityMart Shopping Experience link'),

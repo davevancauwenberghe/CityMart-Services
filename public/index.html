@@ -3,32 +3,67 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CityMart Services - A Discord bot for the CityMart Group" />
+  <meta name="theme-color" content="#38a34a" />
+  <link rel="icon" href="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" type="image/png" />
   <title>CityMart Services Bot</title>
   <style>
     /* Reset & base */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
 
+    :root {
+      --primary-color: #38a34a;
+      --background-color: #2c2c34;
+      --text-color: #ffffff;
+      --text-secondary: rgba(255,255,255,0.7);
+      --gradient-start: #2c2c34;
+      --gradient-end: #1a1a1f;
+    }
+
+    #particles-js {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+
     body {
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #38a34a;
-      color: #ffffff;
+      background-color: var(--primary-color);
+      color: var(--text-color);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      position: relative;
+      width: 90%;
+      max-width: 400px;
+      transition: transform 0.3s ease;
+      z-index: 1;
+    }
+
+    .wrapper:hover {
+      transform: translateY(-5px);
     }
 
     #container {
-      background-color: #2c2c34;   /* lighter grey */
+      background: linear-gradient(145deg, var(--gradient-start), var(--gradient-end));
       border-radius: 32px;
-      padding: 2rem;
-      max-width: 360px;
-      width: 90%;
+      padding: 2.5rem;
+      width: 100%;
       text-align: center;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-      position: relative;
-      overflow: visible;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      min-height: 500px;
+      margin-top: 64px;
+      transition: all 0.3s ease;
     }
 
     /* Spinner */
@@ -36,7 +71,7 @@
       width: 48px;
       height: 48px;
       border: 4px solid rgba(255,255,255,0.3);
-      border-top-color: #ffffff;
+      border-top-color: var(--text-color);
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin: 0 auto 1rem;
@@ -48,19 +83,28 @@
     /* Logo */
     #logo {
       width: 128px;
+      height: 128px;
       opacity: 0;
-      transform: translateY(0);
+      object-fit: contain;
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
     }
+
     @keyframes logoMoveUp {
       from {
         opacity: 0;
-        transform: translateY(0);
+        transform: translate(-50%, 0);
       }
       to {
         opacity: 1;
-        transform: translateY(-80px);
+        transform: translate(-50%, -80px);
       }
     }
+
     .animate-logo {
       animation: logoMoveUp 1s ease-out forwards;
     }
@@ -68,8 +112,10 @@
     /* Content */
     #content {
       opacity: 0;
-      margin-top: 1rem;
+      position: relative;
+      width: 100%;
     }
+
     @keyframes fadeInUp {
       from {
         opacity: 0;
@@ -80,114 +126,299 @@
         transform: translateY(0);
       }
     }
+
     .animate-content {
       animation: fadeInUp 1s ease-out forwards;
       animation-delay: 1s;
     }
 
+    .title-group {
+      margin-bottom: 0.75rem;
+    }
+
     h1 {
       font-size: 1.75rem;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
+      font-weight: 700;
+      display: inline-block;
     }
+    
     p {
       font-size: 1rem;
-      line-height: 1.5;
-      margin: 0.5rem 0;
+      line-height: 1.6;
+      margin: 0.75rem 0;
     }
+
     #content p:nth-of-type(2) {
       margin-top: 1.5rem;
     }
+
     code {
       background: rgba(255,255,255,0.1);
       padding: 0.2em 0.4em;
       border-radius: 4px;
-      font-family: monospace;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .version {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(56, 163, 74, 0.1);
+      padding: 0.3rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-left: 0.5rem;
+      transition: background-color 0.3s ease;
+      vertical-align: middle;
+    }
+
+    .version:hover {
+      background: rgba(56, 163, 74, 0.2);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(56, 163, 74, 0.2);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      margin: 1rem 0;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      background: #38a34a;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+      box-shadow: 0 0 10px #38a34a;
+    }
+
+    @keyframes pulse {
+      0% { 
+        transform: scale(1);
+        opacity: 1;
+        box-shadow: 0 0 10px #38a34a;
+      }
+      50% { 
+        transform: scale(1.2);
+        opacity: 0.8;
+        box-shadow: 0 0 20px #38a34a;
+      }
+      100% { 
+        transform: scale(1);
+        opacity: 1;
+        box-shadow: 0 0 10px #38a34a;
+      }
     }
 
     /* GitHub buttons & timestamp */
     #github-buttons {
       margin-top: 1.5rem;
       display: flex;
-      gap: 0.5rem;
+      gap: 0.75rem;
       justify-content: center;
     }
+
     #timestamp {
-      margin-top: 0.75rem;
+      margin-top: 1rem;
       font-size: 0.85rem;
-      color: rgba(255,255,255,0.7);
+      color: var(--text-secondary);
+      padding: 0.5rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      #container {
+        margin-top: 50px;
+        padding: 1.5rem;
+        min-height: 450px;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      #logo {
+        width: 100px;
+        height: 100px;
+      }
+    }
+
+    @media (max-height: 600px) {
+      #container {
+        margin: 2rem 0;
+        min-height: 400px;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="container">
-    <!-- spinner and logo both visible within container -->
-    <div id="spinner"></div>
+  <div id="particles-js"></div>
+  <div class="wrapper">
     <img
       id="logo"
       src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png"
       alt="CityMart Logo"
+      loading="eager"
     />
-    <div id="content">
-      <h1>CityMart Services Bot</h1>
-      <p>Your friendly Discord helper for the CityMart Group.</p>
-      <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
-      <p>Status: 🟢 Online</p>
-      <div id="github-buttons">
-        <a class="github-button"
-           href="https://github.com/davevancauwenberghe/CityMart-Services"
-           data-color-scheme="no-preference: light; light: light; dark: dark;"
-           data-icon="octicon-star"
-           data-size="large"
-           data-show-count="true"
-           aria-label="Star davevancauwenberghe/CityMart-Services on GitHub">
-          Star
-        </a>
-        <a class="github-button"
-           href="https://github.com/davevancauwenberghe/CityMart-Services/issues"
-           data-color-scheme="no-preference: light; light: light; dark: dark;"
-           data-icon="octicon-issue-opened"
-           data-size="large"
-           data-show-count="true"
-           aria-label="Issue davevancauwenberghe/CityMart-Services on GitHub">
-          Issue
-        </a>
+    <div id="container">
+      <div id="spinner"></div>
+      <div id="content">
+        <div class="title-group">
+          <h1>CityMart Services Bot</h1>
+          <span class="version">v1.0.6</span>
+        </div>
+        <p>Your friendly Discord helper for the CityMart Group.</p>
+        <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+        <div class="status">
+          <span class="status-dot"></span>
+          <span>Online</span>
+        </div>
+        <div id="github-buttons">
+          <a class="github-button"
+             href="https://github.com/davevancauwenberghe/CityMart-Services"
+             data-color-scheme="no-preference: light; light: light; dark: dark;"
+             data-icon="octicon-star"
+             data-size="large"
+             data-show-count="true"
+             aria-label="Star davevancauwenberghe/CityMart-Services on GitHub">
+            Star
+          </a>
+          <a class="github-button"
+             href="https://github.com/davevancauwenberghe/CityMart-Services/issues"
+             data-color-scheme="no-preference: light; light: light; dark: dark;"
+             data-icon="octicon-issue-opened"
+             data-size="large"
+             data-show-count="true"
+             aria-label="Issue davevancauwenberghe/CityMart-Services on GitHub">
+            Issue
+          </a>
+        </div>
+        <div id="timestamp"></div>
       </div>
-      <div id="timestamp"></div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
   <script async defer src="https://buttons.github.io/buttons.js"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => {
       const spinner = document.getElementById('spinner');
-      const logo    = document.getElementById('logo');
+      const logo = document.getElementById('logo');
       const content = document.getElementById('content');
-      const tsEl    = document.getElementById('timestamp');
+      const container = document.getElementById('container');
+      const tsEl = document.getElementById('timestamp');
 
-      // kick off animations after 2s
-      setTimeout(() => {
+      // Initialize particles
+      particlesJS('particles-js',
+        {
+          "particles": {
+            "number": {
+              "value": 50,
+              "density": {
+                "enable": true,
+                "value_area": 800
+              }
+            },
+            "color": {
+              "value": "#38a34a"
+            },
+            "shape": {
+              "type": "circle"
+            },
+            "opacity": {
+              "value": 0.2,
+              "random": false
+            },
+            "size": {
+              "value": 3,
+              "random": true
+            },
+            "line_linked": {
+              "enable": true,
+              "distance": 150,
+              "color": "#38a34a",
+              "opacity": 0.1,
+              "width": 1
+            },
+            "move": {
+              "enable": true,
+              "speed": 2,
+              "direction": "none",
+              "random": false,
+              "straight": false,
+              "out_mode": "out",
+              "bounce": false
+            }
+          },
+          "interactivity": {
+            "detect_on": "canvas",
+            "events": {
+              "onhover": {
+                "enable": true,
+                "mode": "repulse"
+              },
+              "resize": true
+            }
+          },
+          "retina_detect": true
+        }
+      );
+
+      // Preload logo image
+      const preloadImg = new Image();
+      preloadImg.src = logo.src;
+
+      // Calculate and set container height before animations
+      function setContainerHeight() {
+        // Temporarily make content visible but transparent to measure its height
+        content.style.opacity = '0';
+        content.style.display = 'block';
+        
+        // Get the total height needed
+        const contentHeight = content.offsetHeight;
+        const totalHeight = Math.max(500, contentHeight + 40); // Add padding
+        
+        // Set container height
+        container.style.height = `${totalHeight}px`;
+        
+        // Reset content visibility
+        content.style.display = '';
+        content.style.opacity = '';
+      }
+
+      // Start animations when logo is loaded or after 2s
+      const startAnimations = () => {
+        setContainerHeight();
         spinner.style.display = 'none';
         logo.classList.add('animate-logo');
         content.classList.add('animate-content');
-      }, 2000);
+      };
 
-      // update Brussels time every second
+      preloadImg.onload = () => {
+        setTimeout(startAnimations, 1000);
+      };
+
+      // Fallback if image load takes too long
+      setTimeout(startAnimations, 2000);
+
+      // Update timestamp every second
       function updateTimestamp() {
         const now = new Date();
-        const brussels = now.toLocaleString('en-GB', {
-          timeZone: 'Europe/Brussels',
-          year: 'numeric',
-          month: 'long',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          hour12: false
-        });
-        tsEl.textContent = `Bot time - ${brussels}`;
+        const formatted = now.toISOString().replace('T', ' ').slice(0, 19);
+        tsEl.textContent = `Bot time - ${formatted}`;
       }
       updateTimestamp();
       setInterval(updateTimestamp, 1000);
+
+      // Add resize handler to adjust container height if needed
+      window.addEventListener('resize', setContainerHeight);
     });
   </script>
 </body>
