@@ -12,6 +12,18 @@ const commands = [
   new SlashCommandBuilder()
     .setName('ping')
     .setDescription('Check the bot latency'),
+  new SlashCommandBuilder()
+    .setName('community')
+    .setDescription('Get the Roblox Community link'),
+  new SlashCommandBuilder()
+    .setName('experience')
+    .setDescription('Get the CityMart Shopping Experience link'),
+  new SlashCommandBuilder()
+    .setName('lorebook')
+    .setDescription('Open the CityMart Lore Book'),
+  new SlashCommandBuilder()
+    .setName('lamp')
+    .setDescription("Shh... the lamp doesn't exist")
 ].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);

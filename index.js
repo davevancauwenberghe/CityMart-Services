@@ -1,3 +1,4 @@
+// index.js
 require('dotenv').config();
 const { 
   Client, 
@@ -30,7 +31,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Community')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription('Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up‑to‑date on all our events.')
+      .setDescription('Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up-to-date on all our events.')
       .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
       .setTimestamp()
   },
@@ -83,16 +84,16 @@ const HELP_EMBED = new EmbedBuilder()
   .setThumbnail(THUMBNAIL_URL)
   .setColor(0x00FFAA)
   .setDescription(
-    '🔗 Roblox Links\n' +
+    '**🔗 Roblox Links**\n' +
     '• community\n' +
     '• experience\n\n' +
-    '🆘 Support\n' +
+    '**📥 Support**\n' +
     '• support\n\n' +
-    '📖 Misc\n' +
+    '**📖 Misc**\n' +
     '• lorebook\n' +
     '• lamp\n' +
     '• ping\n\n' +
-    `🔗 [Bot Dashboard](${BOT_URL})`
+    `🤖 [Bot Dashboard](${BOT_URL})`
   )
   .setFooter({ text: 'Use @CityMart Services <keyword> to invoke a command' })
   .setTimestamp();
@@ -101,7 +102,7 @@ client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-// Mention‑based handling
+// Mention-based handling
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
   const msg = message.content.toLowerCase();
@@ -115,7 +116,7 @@ client.on('messageCreate', async message => {
   // all others require a mention
   if (!message.mentions.has(client.user)) return;
 
-  // ping as mention‑based command
+  // ping as mention-based command
   if (/\bping\b/.test(msg)) {
     const latency = Date.now() - message.createdTimestamp;
     const pingEmbed = new EmbedBuilder()
@@ -157,13 +158,27 @@ client.on('messageCreate', async message => {
   await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
 });
 
-// Slash‑command handler
+// Slash-command handler
 client.on('interactionCreate', async interaction => {
   if (!interaction.isCommand()) return;
-  const { commandName, createdTimestamp } = interaction;
+  const { commandName, createdTimestamp, user } = interaction;
 
   if (commandName === 'keywords') {
     await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
+
+  } else if (['community', 'experience', 'lorebook', 'lamp'].includes(commandName)) {
+    const trigger = TRIGGERS.find(t => t.keyword === commandName);
+    if (!trigger) {
+      return interaction.reply({
+        content: "Sorry, I couldn't find that command's configuration.",
+        ephemeral: true
+      });
+    }
+    await interaction.reply({
+      content: `${user}`,
+      embeds: [trigger.embed],
+      ephemeral: false
+    });
 
   } else if (commandName === 'support') {
     const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
@@ -173,7 +188,11 @@ client.on('interactionCreate', async interaction => {
       .setStyle(ButtonStyle.Link)
       .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
     const row = new ActionRowBuilder().addComponents(supportBtn);
-    await interaction.reply({ embeds: [supportEmbed], components: [row], ephemeral: false });
+    await interaction.reply({
+      embeds: [supportEmbed],
+      components: [row],
+      ephemeral: false
+    });
 
   } else if (commandName === 'ping') {
     const latency = Date.now() - createdTimestamp;
@@ -193,6 +212,7 @@ client.on('interactionCreate', async interaction => {
 
 client.login(process.env.DISCORD_TOKEN);
 
+// Simple HTTP server for landing page
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
   const filePath = path.join(__dirname, 'public', 'index.html');
@@ -205,5 +225,5 @@ http.createServer((req, res) => {
     res.end(html);
   });
 }).listen(PORT, '0.0.0.0', () => {
-  console.log(`🌐 HTTP server listening on port ${PORT}`);
+  console.log(`🌐 HTTP server listening on 0.0.0.0:${PORT}`);
 });
