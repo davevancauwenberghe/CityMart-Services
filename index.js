@@ -84,16 +84,16 @@ const HELP_EMBED = new EmbedBuilder()
   .setThumbnail(THUMBNAIL_URL)
   .setColor(0x00FFAA)
   .setDescription(
-    '🔗 Roblox Links\n' +
+    '**🔗 Roblox Links**\n' +
     '• community\n' +
     '• experience\n\n' +
-    '🆘 Support\n' +
+    '**📥 Support**\n' +
     '• support\n\n' +
-    '📖 Misc\n' +
+    '**📖 Misc**\n' +
     '• lorebook\n' +
     '• lamp\n' +
     '• ping\n\n' +
-    `🔗 [Bot Dashboard](${BOT_URL})`
+    `🤖 [Bot Dashboard](${BOT_URL})`
   )
   .setFooter({ text: 'Use @CityMart Services <keyword> to invoke a command' })
   .setTimestamp();
