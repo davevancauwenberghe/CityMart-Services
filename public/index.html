@@ -14,11 +14,11 @@
 
     :root {
       --primary-color: #38a34a;
-      --background-color: #2c2c34;
-      --text-color: #ffffff;
-      --text-secondary: rgba(255,255,255,0.7);
       --gradient-start: #2c2c34;
       --gradient-end: #1a1a1f;
+      --text-color: #ffffff;
+      --text-secondary: rgba(255,255,255,0.7);
+      --discord-blue: #5865F2;
     }
 
     #particles-js {
@@ -40,6 +40,7 @@
       overflow: hidden;
       line-height: 1.6;
       min-height: 100vh;
+      padding: 1rem;
     }
 
     .wrapper {
@@ -64,6 +65,8 @@
       min-height: 500px;
       margin-top: 64px;
       transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
     }
 
     /* Spinner */
@@ -90,7 +93,7 @@
       position: absolute;
       top: 0;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, 0);
       z-index: 2;
     }
 
@@ -114,6 +117,7 @@
       opacity: 0;
       position: relative;
       width: 100%;
+      padding-top: 60px; /* space for the lifted logo */
     }
 
     @keyframes fadeInUp {
@@ -134,13 +138,16 @@
 
     .title-group {
       margin-bottom: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
     }
 
     h1 {
       font-size: 1.75rem;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0;
       font-weight: 700;
-      display: inline-block;
     }
     
     p {
@@ -169,7 +176,6 @@
       border-radius: 12px;
       font-size: 0.8rem;
       color: var(--text-secondary);
-      margin-left: 0.5rem;
       transition: background-color 0.3s ease;
       vertical-align: middle;
     }
@@ -215,12 +221,31 @@
       }
     }
 
-    /* GitHub buttons & timestamp */
+    /* Buttons & timestamp */
     #github-buttons {
       margin-top: 1.5rem;
       display: flex;
       gap: 0.75rem;
       justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .discord-invite {
+      background: var(--discord-blue);
+      color: #fff;
+      padding: 0.5em 0.9em;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .discord-invite:hover {
+      filter: brightness(1.1);
     }
 
     #timestamp {
@@ -230,6 +255,7 @@
       padding: 0.5rem;
       border-radius: 8px;
       background: rgba(255,255,255,0.05);
+      display: inline-block;
     }
 
     /* Responsive adjustments */
@@ -271,7 +297,9 @@
       <div id="spinner"></div>
       <div id="content">
         <div class="title-group">
-          <h1>CityMart Services Bot</h1>
+          <div>
+            <h1>CityMart Services Bot</h1>
+          </div>
           <span class="version">v1.0.6</span>
         </div>
         <p>Your friendly Discord helper for the CityMart Group.</p>
@@ -299,6 +327,10 @@
              aria-label="Issue davevancauwenberghe/CityMart-Services on GitHub">
             Issue
           </a>
+          <a class="discord-invite" href="https://discord.gg/vbCjaVjBeQ" aria-label="Join CityMart Discord">
+            <!-- simple emoji as icon -->
+            <span>Join Discord</span>
+          </a>
         </div>
         <div id="timestamp"></div>
       </div>
@@ -316,109 +348,68 @@
       const tsEl = document.getElementById('timestamp');
 
       // Initialize particles
-      particlesJS('particles-js',
-        {
-          "particles": {
-            "number": {
-              "value": 50,
-              "density": {
+      if (window.particlesJS) {
+        particlesJS('particles-js',
+          {
+            "particles": {
+              "number": { "value": 50, "density": { "enable": true, "value_area": 800 } },
+              "color": { "value": "#38a34a" },
+              "shape": { "type": "circle" },
+              "opacity": { "value": 0.2, "random": false },
+              "size": { "value": 3, "random": true },
+              "line_linked": {
                 "enable": true,
-                "value_area": 800
+                "distance": 150,
+                "color": "#38a34a",
+                "opacity": 0.1,
+                "width": 1
+              },
+              "move": {
+                "enable": true,
+                "speed": 2,
+                "direction": "none",
+                "random": false,
+                "straight": false,
+                "out_mode": "out",
+                "bounce": false
               }
             },
-            "color": {
-              "value": "#38a34a"
+            "interactivity": {
+              "detect_on": "canvas",
+              "events": {
+                "onhover": { "enable": true, "mode": "repulse" },
+                "resize": true
+              }
             },
-            "shape": {
-              "type": "circle"
-            },
-            "opacity": {
-              "value": 0.2,
-              "random": false
-            },
-            "size": {
-              "value": 3,
-              "random": true
-            },
-            "line_linked": {
-              "enable": true,
-              "distance": 150,
-              "color": "#38a34a",
-              "opacity": 0.1,
-              "width": 1
-            },
-            "move": {
-              "enable": true,
-              "speed": 2,
-              "direction": "none",
-              "random": false,
-              "straight": false,
-              "out_mode": "out",
-              "bounce": false
-            }
-          },
-          "interactivity": {
-            "detect_on": "canvas",
-            "events": {
-              "onhover": {
-                "enable": true,
-                "mode": "repulse"
-              },
-              "resize": true
-            }
-          },
-          "retina_detect": true
-        }
-      );
-
-      // Preload logo image
-      const preloadImg = new Image();
-      preloadImg.src = logo.src;
-
-      // Calculate and set container height before animations
-      function setContainerHeight() {
-        // Temporarily make content visible but transparent to measure its height
-        content.style.opacity = '0';
-        content.style.display = 'block';
-        
-        // Get the total height needed
-        const contentHeight = content.offsetHeight;
-        const totalHeight = Math.max(500, contentHeight + 40); // Add padding
-        
-        // Set container height
-        container.style.height = `${totalHeight}px`;
-        
-        // Reset content visibility
-        content.style.display = '';
-        content.style.opacity = '';
+            "retina_detect": true
+          }
+        );
       }
 
-      // Start animations when logo is loaded or after 2s
-      const startAnimations = () => {
-        setContainerHeight();
-        spinner.style.display = 'none';
-        logo.classList.add('animate-logo');
-        content.classList.add('animate-content');
-      };
-
-      preloadImg.onload = () => {
-        setTimeout(startAnimations, 1000);
-      };
-
-      // Fallback if image load takes too long
-      setTimeout(startAnimations, 2000);
-
-      // Update timestamp every second
+      // Live Brussels time
       function updateTimestamp() {
         const now = new Date();
-        const formatted = now.toISOString().replace('T', ' ').slice(0, 19);
-        tsEl.textContent = `Bot time - ${formatted}`;
+        const brussels = now.toLocaleString('en-GB', {
+          timeZone: 'Europe/Brussels',
+          year: 'numeric',
+          month: 'long',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        });
+        tsEl.textContent = `Bot time — ${brussels}`;
       }
       updateTimestamp();
       setInterval(updateTimestamp, 1000);
 
-      // Add resize handler to adjust container height if needed
-      window.addEventListener('resize', setContainerHeight);
+      // Start animation after delay
+      setTimeout(() => {
+        spinner.style.display = 'none';
+        logo.classList.add('animate-logo');
+        content.classList.add('animate-content');
+      }, 2000);
     });
   </script>
 </body>
