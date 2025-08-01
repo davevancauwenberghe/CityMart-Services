@@ -20,7 +20,7 @@ This project includes a `Dockerfile` and is ready for Fly.io. Simply point your 
 
 ## 🤝 Contributing
 
-Please make sure your code follows the existing style, includes documentation for any new commands, and passes any tests or CI checks before merging. Thanks for helping improve CityMart Services!
+Please make sure your code follows the existing style, includes documentation for any new commands, and passes any tests or CI checks before merging. Thanks for helping improve CityMart Services! See the [CONTRIBUTING](CONTRIBUTING.MD) file for details.
 
 ## 📄 License
 
