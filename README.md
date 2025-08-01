@@ -1,6 +1,9 @@
 # CityMart Services | Discord Bot
 
-![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow.svg)  ![Docker](https://img.shields.io/badge/Container-Docker-blue.svg)  ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+[![CodeQL Advanced](https://github.com/davevancauwenberghe/CityMart-Services/actions/workflows/codeql.yml/badge.svg)](https://github.com/davevancauwenberghe/CityMart-Services/actions/workflows/codeql.yml)
+![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow.svg)
+![Docker](https://img.shields.io/badge/Container-Docker-blue.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services <keyword>" and replies with rich embeds for commands like "community", "experience", "support", and "lorebook".
 
