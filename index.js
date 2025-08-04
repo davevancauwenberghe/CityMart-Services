@@ -6,11 +6,15 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  ActivityType
 } = require('discord.js');
 const http = require('http');
 const fs   = require('fs');
 const path = require('path');
+
+const userCooldowns = new Map();
+const COOLDOWN_MS = 5000;
 
 const client = new Client({
   intents: [
@@ -24,6 +28,9 @@ const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const GUILD_ID = process.env.GUILD_ID;
 const BOT_URL = 'https://citymart-bot.fly.dev/';
 const THUMBNAIL_URL = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
+
+const CITYMART_EMOJI = '<:citymart:>';
+const REACTION_KEYWORDS = ['shopping', 'mart', 'cart', 'shop', 'store', 'lamp'];
 
 const TRIGGERS = [
   {
@@ -100,119 +107,153 @@ const HELP_EMBED = new EmbedBuilder()
 
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
+  client.user.setPresence({
+    activities: [{ name: 'CityMart Shoppers 🛒', type: ActivityType.Watching }],
+    status: 'online'
+  });
 });
 
-// Mention-based handling
 client.on('messageCreate', async message => {
-  if (message.author.bot || !message.guild) return;
-  const msg = message.content.toLowerCase();
+  try {
+    if (message.author.bot || !message.guild) return;
 
-  // lamp always fires, no mention needed
-  if (/\blamp\b/.test(msg)) {
-    const lampEmbed = TRIGGERS.find(t => t.keyword === 'lamp').embed;
-    return message.channel.send({ content: `${message.author}`, embeds: [lampEmbed] });
-  }
+    const now = Date.now();
+    const last = userCooldowns.get(message.author.id) || 0;
+    if (now - last < COOLDOWN_MS) return;
+    userCooldowns.set(message.author.id, now);
 
-  // all others require a mention
-  if (!message.mentions.has(client.user)) return;
+    const msg = message.content.toLowerCase();
 
-  // ping as mention-based command
-  if (/\bping\b/.test(msg)) {
-    const latency = Date.now() - message.createdTimestamp;
-    const pingEmbed = new EmbedBuilder()
-      .setTitle('🏓 Pong!')
-      .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        `Latency is **${latency}ms**\n\n` +
-        `🔗 [Bot Dashboard](${BOT_URL})`
-      )
-      .setColor(0x00FFAA)
-      .setFooter({ text: 'CityMart Services' })
-      .setTimestamp();
-    return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
-  }
-
-  // other keyword triggers
-  for (const trigger of TRIGGERS) {
-    if (trigger.keyword === 'lamp') continue;
-    const re = new RegExp(`\\b${trigger.keyword}\\b`);
-    if (re.test(msg)) {
-      let components = [];
-      if (trigger.keyword === 'support') {
-        const supportBtn = new ButtonBuilder()
-          .setLabel('Go to Support')
-          .setEmoji('❓')
-          .setStyle(ButtonStyle.Link)
-          .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
-        components = [ new ActionRowBuilder().addComponents(supportBtn) ];
+    for (const word of REACTION_KEYWORDS) {
+      if (msg.includes(word)) {
+        try {
+          await message.react(CITYMART_EMOJI);
+        } catch (e) {
+        }
+        break;
       }
-      return message.channel.send({
-        content: `${message.author}`,
-        embeds: [trigger.embed],
-        components
-      });
     }
-  }
 
-  // fallback: help embed
-  await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
+    if (/\blamp\b/.test(msg)) {
+      const lampEmbed = TRIGGERS.find(t => t.keyword === 'lamp').embed;
+      return message.channel.send({ content: `${message.author}`, embeds: [lampEmbed] });
+    }
+
+    if (!message.mentions.has(client.user)) return;
+
+    if (/\bping\b/.test(msg)) {
+      const latency = Date.now() - message.createdTimestamp;
+      const pingEmbed = new EmbedBuilder()
+        .setTitle('🏓 Pong!')
+        .setThumbnail(THUMBNAIL_URL)
+        .setDescription(
+          `Latency is **${latency}ms**\n\n` +
+          `🔗 [Bot Dashboard](${BOT_URL})`
+        )
+        .setColor(0x00FFAA)
+        .setFooter({ text: 'CityMart Services' })
+        .setTimestamp();
+      return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
+    }
+
+    for (const trigger of TRIGGERS) {
+      if (trigger.keyword === 'lamp') continue;
+      const re = new RegExp(`\\b${trigger.keyword}\\b`);
+      if (re.test(msg)) {
+        let components = [];
+        if (trigger.keyword === 'support') {
+          const supportBtn = new ButtonBuilder()
+            .setLabel('Go to Support')
+            .setEmoji('❓')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
+          components = [ new ActionRowBuilder().addComponents(supportBtn) ];
+        }
+        return message.channel.send({
+          content: `${message.author}`,
+          embeds: [trigger.embed],
+          components
+        });
+      }
+    }
+
+    // fallback: help embed
+    await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
+  } catch (err) {
+    console.error('Error in messageCreate handler:', err);
+  }
 });
 
 // Slash-command handler
 client.on('interactionCreate', async interaction => {
-  if (!interaction.isCommand()) return;
-  const { commandName, createdTimestamp, user } = interaction;
+  try {
+    if (!interaction.isCommand()) return;
+    const { commandName, createdTimestamp, user } = interaction;
 
-  if (commandName === 'keywords') {
-    await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
-
-  } else if (['community', 'experience', 'lorebook', 'lamp'].includes(commandName)) {
-    const trigger = TRIGGERS.find(t => t.keyword === commandName);
-    if (!trigger) {
-      return interaction.reply({
-        content: "Sorry, I couldn't find that command's configuration.",
-        ephemeral: true
-      });
+    const now = Date.now();
+    const last = userCooldowns.get(user.id) || 0;
+    if (now - last < COOLDOWN_MS) {
+      return interaction.reply({ content: "⏳ Please wait a few seconds before using another command.", ephemeral: true });
     }
-    await interaction.reply({
-      content: `${user}`,
-      embeds: [trigger.embed],
-      ephemeral: false
-    });
+    userCooldowns.set(user.id, now);
 
-  } else if (commandName === 'support') {
-    const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
-    const supportBtn = new ButtonBuilder()
-      .setLabel('Go to Support')
-      .setEmoji('❓')
-      .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
-    const row = new ActionRowBuilder().addComponents(supportBtn);
-    await interaction.reply({
-      embeds: [supportEmbed],
-      components: [row],
-      ephemeral: false
-    });
+    if (commandName === 'keywords') {
+      await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
 
-  } else if (commandName === 'ping') {
-    const latency = Date.now() - createdTimestamp;
-    const pingEmbed = new EmbedBuilder()
-      .setTitle('🏓 Pong!')
-      .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        `Latency is **${latency}ms**\n\n` +
-        `🔗 [Bot Dashboard](${BOT_URL})`
-      )
-      .setColor(0x00FFAA)
-      .setFooter({ text: 'CityMart Services' })
-      .setTimestamp();
-    await interaction.reply({ embeds: [pingEmbed], ephemeral: false });
+    } else if (['community', 'experience', 'lorebook', 'lamp'].includes(commandName)) {
+      const trigger = TRIGGERS.find(t => t.keyword === commandName);
+      if (!trigger) {
+        return interaction.reply({
+          content: "Sorry, I couldn't find that command's configuration.",
+          ephemeral: true
+        });
+      }
+      await interaction.reply({
+        content: `${user}`,
+        embeds: [trigger.embed],
+        ephemeral: false
+      });
+
+    } else if (commandName === 'support') {
+      const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
+      const supportBtn = new ButtonBuilder()
+        .setLabel('Go to Support')
+        .setEmoji('❓')
+        .setStyle(ButtonStyle.Link)
+        .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
+      const row = new ActionRowBuilder().addComponents(supportBtn);
+      await interaction.reply({
+        embeds: [supportEmbed],
+        components: [row],
+        ephemeral: false
+      });
+
+    } else if (commandName === 'ping') {
+      const latency = Date.now() - createdTimestamp;
+      const pingEmbed = new EmbedBuilder()
+        .setTitle('🏓 Pong!')
+        .setThumbnail(THUMBNAIL_URL)
+        .setDescription(
+          `Latency is **${latency}ms**\n\n` +
+          `🔗 [Bot Dashboard](${BOT_URL})`
+        )
+        .setColor(0x00FFAA)
+        .setFooter({ text: 'CityMart Services' })
+        .setTimestamp();
+      await interaction.reply({ embeds: [pingEmbed], ephemeral: false });
+    }
+  } catch (err) {
+    console.error('Error in interactionCreate handler:', err);
+    try {
+      if (interaction && !interaction.replied) {
+        await interaction.reply({ content: "⚠️ An error occurred while processing your command.", ephemeral: true });
+      }x
+    } catch {}
   }
 });
 
 client.login(process.env.DISCORD_TOKEN);
 
-// Simple HTTP server for landing page
 const PORT = process.env.PORT || 8080;
 http.createServer((req, res) => {
   const filePath = path.join(__dirname, 'public', 'index.html');
