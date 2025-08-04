@@ -247,7 +247,7 @@ client.on('interactionCreate', async interaction => {
     try {
       if (interaction && !interaction.replied) {
         await interaction.reply({ content: "⚠️ An error occurred while processing your command.", ephemeral: true });
-      }x
+      }
     } catch {}
   }
 });
