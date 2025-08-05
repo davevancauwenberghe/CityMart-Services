@@ -38,19 +38,21 @@ const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const BOT_URL = 'https://citymart-bot.fly.dev/';
 const THUMBNAIL_URL = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
 
-// Custom emoji: ensure it's a valid emoji string, else fallback
+// Custom emojis
 const CITYMART_EMOJI_RAW = '<:citymart:1400628955253575711>';
+const LAMP_EMOJI_RAW    = '<:lamp:1402100477134508222>';
 const CITYMART_EMOJI = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_EMOJI_RAW : '🛒';
+const LAMP_EMOJI     = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI_RAW    : '💡';
 
 // Reaction keywords
-const REACTION_KEYWORDS = ['shopping', 'mart', 'cart', 'shop', 'store', 'lamp'];
+const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
 
-// Utility to escape regex special chars (defensive)
+// Utility to escape regex special chars
 function escapeForRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Build triggers with precompiled regex
+// Build triggers with precompiled regex + embeds
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -112,9 +114,11 @@ const TRIGGERS = [
       .setColor(0xFFD700)
       .setDescription(
         "💡 We don't talk about the lamp. The lamp doesn't exist.\n\n" +
-          'Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, ' +
-          'no one dares mention it again. Handle with caution!'
+        'Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, ' +
+        'no one dares mention it again. Handle with caution!'
       )
+      // ← new image for the lamp embed:
+      .setImage('https://storage.davevancauwenberghe.be/citymart/visuals/lamp.png')
       .setFooter({ text: 'Shh... the lamp is gone' })
       .setTimestamp()
   }
@@ -128,30 +132,32 @@ const HELP_EMBED = new EmbedBuilder()
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
     { name: '🔗 Roblox Links', value: 'community\nexperience', inline: false },
-    { name: '🆘 Support', value: 'support', inline: false },
-    { name: '📖 Misc', value: 'lorebook\nlamp\nping', inline: false },
-    { name: '🔗 Dashboard', value: `[Bot Dashboard](${BOT_URL})`, inline: false }
+    { name: '🆘 Support',        value: 'support',           inline: false },
+    { name: '📖 Misc',           value: 'lorebook\nlamp\nping', inline: false },
+    { name: '🔗 Dashboard',      value: `[Bot Dashboard](${BOT_URL})`, inline: false }
   )
   .setFooter({
     text: 'Need help? Ping CityMart Services with a keyword or use /keywords'
   })
   .setTimestamp();
 
+// Periodic cleanup of stale cooldown entries
 setInterval(() => {
   const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour
-  for (const [userId, timestamp] of userCooldowns.entries()) {
-    if (timestamp < cutoff) userCooldowns.delete(userId);
+  for (const [uid, ts] of userCooldowns) {
+    if (ts < cutoff) userCooldowns.delete(uid);
   }
 }, 30 * 60 * 1000);
 
-// Helper to build support button row
+// Support button helper
 function createSupportRow() {
-  const supportBtn = new ButtonBuilder()
-    .setLabel('Go to Support')
-    .setEmoji('❓')
-    .setStyle(ButtonStyle.Link)
-    .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`);
-  return new ActionRowBuilder().addComponents(supportBtn);
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('Go to Support')
+      .setEmoji('❓')
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
+  );
 }
 
 client.once('ready', () => {
@@ -166,40 +172,38 @@ client.on('messageCreate', async message => {
   try {
     if (message.author.bot || !message.guild) return;
 
-    const now = Date.now();
+    const now  = Date.now();
     const last = userCooldowns.get(message.author.id) || 0;
     if (now - last < COOLDOWN_MS) return;
     userCooldowns.set(message.author.id, now);
 
     const msg = message.content.toLowerCase();
 
-    // Reaction logic (first matching keyword)
+    // Reaction logic: use lamp emoji for "lamp", CityMart emoji otherwise
     for (const word of REACTION_KEYWORDS) {
       if (msg.includes(word)) {
+        const emojiToUse = word === 'lamp' ? LAMP_EMOJI : CITYMART_EMOJI;
         try {
-          await message.react(CITYMART_EMOJI);
-        } catch (e) {
-          console.warn('Failed to react with emoji:', e?.message || e);
+          await message.react(emojiToUse);
+        } catch (err) {
+          console.warn(`Failed to react with ${emojiToUse}:`, err.message);
         }
         break;
       }
     }
 
-    // Lamp fires regardless of mention
-    if (/\blamp\b/i.test(msg)) {
-      const lampTrigger = TRIGGERS.find(t => t.keyword === 'lamp');
-      if (lampTrigger) {
-        return message.channel.send({
-          content: `${message.author}`,
-          embeds: [lampTrigger.embed]
-        });
-      }
+    // Lamp embed fires regardless of mention
+    if (TRIGGERS[4].regex.test(msg)) {
+      return message.channel.send({
+        content: `${message.author}`,
+        embeds: [TRIGGERS[4].embed]
+      });
     }
 
     // Other keywords require mention
     if (!message.mentions.has(client.user)) return;
 
-    // Ping as mention-based command
+    // Ping
     if (/\bping\b/i.test(msg)) {
       const latency = Date.now() - message.createdTimestamp;
       const pingEmbed = new EmbedBuilder()
@@ -212,7 +216,7 @@ client.on('messageCreate', async message => {
       return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
     }
 
-    // Keyword triggers
+    // Other triggers
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
       if (trigger.regex.test(msg)) {
@@ -225,7 +229,7 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // fallback
+    // Fallback
     await message.channel.send({
       content: `${message.author}`,
       embeds: [HELP_EMBED]
@@ -235,13 +239,12 @@ client.on('messageCreate', async message => {
   }
 });
 
-// Slash-command handler
 client.on('interactionCreate', async interaction => {
   try {
     if (!interaction.isCommand()) return;
     const { commandName, createdTimestamp, user } = interaction;
 
-    const now = Date.now();
+    const now  = Date.now();
     const last = userCooldowns.get(user.id) || 0;
     if (now - last < COOLDOWN_MS) {
       return interaction.reply({
@@ -253,7 +256,8 @@ client.on('interactionCreate', async interaction => {
 
     if (commandName === 'keywords') {
       await interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
-    } else if (['community', 'experience', 'lorebook', 'lamp'].includes(commandName)) {
+
+    } else if (['community','experience','lorebook','lamp'].includes(commandName)) {
       const trigger = TRIGGERS.find(t => t.keyword === commandName);
       if (!trigger) {
         return interaction.reply({
@@ -266,19 +270,15 @@ client.on('interactionCreate', async interaction => {
         embeds: [trigger.embed],
         ephemeral: false
       });
+
     } else if (commandName === 'support') {
       const supportEmbed = TRIGGERS.find(t => t.keyword === 'support')?.embed;
-      if (!supportEmbed) {
-        return interaction.reply({
-          content: 'Support configuration missing.',
-          ephemeral: true
-        });
-      }
       await interaction.reply({
         embeds: [supportEmbed],
         components: [createSupportRow()],
         ephemeral: false
       });
+
     } else if (commandName === 'ping') {
       const latency = Date.now() - createdTimestamp;
       const pingEmbed = new EmbedBuilder()
@@ -292,19 +292,17 @@ client.on('interactionCreate', async interaction => {
     }
   } catch (err) {
     console.error('Error in interactionCreate handler:', err);
-    try {
-      if (interaction && !interaction.replied) {
-        await interaction.reply({
-          content: '⚠️ An error occurred while processing your command.',
-          ephemeral: true
-        });
-      }
-    } catch {}
+    if (!interaction.replied) {
+      try {
+        await interaction.reply({ content: '⚠️ An error occurred.', ephemeral: true });
+      } catch {}
+    }
   }
 });
 
 client.login(process.env.DISCORD_TOKEN);
 
+// Simple HTTP server for landing page
 const PORT = process.env.PORT || 8080;
 http
   .createServer((req, res) => {
@@ -319,5 +317,5 @@ http
     });
   })
   .listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP server listening on port 0.0.0.0:${PORT}`);
+    console.log(`🌐 HTTP server listening on port ${PORT}`);
   });
