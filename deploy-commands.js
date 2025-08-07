@@ -24,7 +24,7 @@ const commands = [
     .setName('lamp')
     .setDescription("Shh... the lamp doesn't exist"),
   new SlashCommandBuilder()
-    .setName('ask hallAI')
+    .setName('ask')
     .setDescription('Ask hallAI a question')
     .addStringOption(option =>
       option
