@@ -1,6 +1,6 @@
 {
   "name": "citymart-bot",
-  "version": "1.0.3",
+  "version": "1.0.9",
   "description": "Discord bot for CityMart Group server",
   "main": "index.js",
   "scripts": {

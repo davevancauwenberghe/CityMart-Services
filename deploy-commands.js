@@ -1,4 +1,3 @@
-// deploy-commands.js
 require('dotenv').config();
 const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
@@ -23,7 +22,16 @@ const commands = [
     .setDescription('Open the CityMart Lore Book'),
   new SlashCommandBuilder()
     .setName('lamp')
-    .setDescription("Shh... the lamp doesn't exist")
+    .setDescription("Shh... the lamp doesn't exist"),
+  new SlashCommandBuilder()
+    .setName('ask hallAI')
+    .setDescription('Ask hallAI a question')
+    .addStringOption(option =>
+      option
+        .setName('prompt')
+        .setDescription('What do you want to ask hallAI?')
+        .setRequired(true)
+    )
 ].map(cmd => cmd.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
