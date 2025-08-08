@@ -1,3 +1,4 @@
+// index.js
 require('dotenv').config();
 const {
   Client,
@@ -17,8 +18,8 @@ const userCooldowns = new Map();
 const COOLDOWN_MS    = 5000;
 
 // Environment sanity
-const GUILD_ID      = process.env.GUILD_ID;
-const WORKER_URL    = process.env.WORKER_URL;        // ← your hallAI Worker URL
+const GUILD_ID   = process.env.GUILD_ID;
+const WORKER_URL = process.env.WORKER_URL; // your hallAI Worker URL
 if (!process.env.DISCORD_TOKEN) {
   console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
 }
@@ -58,7 +59,48 @@ function escapeForRegex(str) {
 
 // Build triggers with precompiled regex + embeds
 const TRIGGERS = [
-  /* community, experience, support, lorebook… identical to before */,
+  {
+    keyword: 'community',
+    regex: new RegExp(`\\b${escapeForRegex('community')}\\b`, 'i'),
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Community')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription('Hey there! 👋 Join our Roblox Community to chat with fellow CityMart shoppers, share tips, and stay up-to-date on all our events.')
+      .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
+      .setTimestamp()
+  },
+  {
+    keyword: 'experience',
+    regex: new RegExp(`\\b${escapeForRegex('experience')}\\b`, 'i'),
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Shopping Experience')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription('Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!')
+      .setURL('https://www.roblox.com/games/84931510725955/CityMart-Shopping')
+      .setTimestamp()
+  },
+  {
+    keyword: 'support',
+    regex: new RegExp(`\\b${escapeForRegex('support')}\\b`, 'i'),
+    embed: new EmbedBuilder()
+      .setTitle('Need Help?')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription('If you’re stuck or have questions, click the button below to jump to our support channel!')
+      .setColor(0xff9900)
+      .setTimestamp()
+  },
+  {
+    keyword: 'lorebook',
+    regex: new RegExp(`\\b${escapeForRegex('lorebook')}\\b`, 'i'),
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Lore Book')
+      .setThumbnail(THUMBNAIL_URL)
+      .setColor(0x00AEFF)
+      .setDescription('Dive deeper into the history, secrets, and unprecedented lore of CityMart in our official Lore Book.')
+      .setURL('https://nervous-flag-247.notion.site/23eee5e2e2ec800db586cd84bf80cbf2?v=23eee5e2e2ec804aa1b3000c2018e0b9')
+      .setFooter({ text: 'CityMart Lore' })
+      .setTimestamp()
+  },
   {
     keyword: 'lamp',
     regex: new RegExp(`\\b${escapeForRegex('lamp')}\\b`, 'i'),
@@ -67,8 +109,8 @@ const TRIGGERS = [
       .setColor(0xFFD700)
       .setDescription(
         "💡 We don't talk about the lamp. The lamp doesn't exist.\n\n" +
-        'Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, ' +
-        'no one dares mention it again. Handle with caution!'
+        "Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, " +
+        "no one dares mention it again. Handle with caution!"
       )
       .setImage('https://storage.davevancauwenberghe.be/citymart/visuals/lamp.png')
       .setFooter({ text: 'Shh... the lamp is gone' })
@@ -83,8 +125,8 @@ const HELP_EMBED = new EmbedBuilder()
   .setColor(0x00FFAA)
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
-    { name: '🔗 Roblox Links', value: 'community\nexperience'      , inline: false },
-    { name: '🆘 Support',        value: 'support'                   , inline: false },
+    { name: '🔗 Roblox Links', value: 'community\nexperience',      inline: false },
+    { name: '🆘 Support',        value: 'support',                   inline: false },
     { name: '📖 Misc',           value: 'lorebook\nlamp\nping\nask', inline: false },
     { name: '🔗 Dashboard',      value: `[Bot Dashboard](${BOT_URL})`, inline: false }
   )
@@ -130,28 +172,27 @@ client.on('messageCreate', async message => {
 
     const msg = message.content.toLowerCase();
 
-    // Reaction logic: lamp uses lamp emoji else CityMart
+    // Reaction logic
     for (const word of REACTION_KEYWORDS) {
       if (msg.includes(word)) {
         const emojiToUse = word === 'lamp' ? LAMP_EMOJI : CITYMART_EMOJI;
-        try { await message.react(emojiToUse); }
-        catch { /* ignore */ }
+        try { await message.react(emojiToUse); } catch {}
         break;
       }
     }
 
-    // Lamp embed regardless of mention
-    if (TRIGGERS.find(t => t.keyword === 'lamp').regex.test(msg)) {
+    // 1) Lamp embed fires anytime
+    if (TRIGGERS[4].regex.test(msg)) {
       return message.channel.send({
         content: `${message.author}`,
-        embeds: [TRIGGERS.find(t => t.keyword === 'lamp').embed]
+        embeds: [TRIGGERS[4].embed]
       });
     }
 
-    // All others require mention
+    // 2) All others require a mention
     if (!message.mentions.has(client.user)) return;
 
-    // Ping (mention-based)
+    // 3) Ping mention-based
     if (/\bping\b/i.test(msg)) {
       const latency = Date.now() - message.createdTimestamp;
       const pingEmbed = new EmbedBuilder()
@@ -164,7 +205,7 @@ client.on('messageCreate', async message => {
       return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
     }
 
-    // Other triggers (community, experience, support, lorebook)
+    // 4) Other keyword triggers
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
       if (trigger.regex.test(msg)) {
@@ -177,7 +218,7 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // Fallback help
+    // 5) Fallback: help embed
     await message.channel.send({
       content: `${message.author}`,
       embeds: [HELP_EMBED]
@@ -200,59 +241,55 @@ client.on('interactionCreate', async interaction => {
     }
     userCooldowns.set(user.id, now);
 
-    // /keywords
-    if (commandName === 'keywords') {
-      return interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
-    }
-
-    // community, experience, lorebook, lamp
-    if (['community','experience','lorebook','lamp'].includes(commandName)) {
-      const trigger = TRIGGERS.find(t => t.keyword === commandName);
-      return interaction.reply({ content: `${user}`, embeds: [trigger.embed], ephemeral: false });
-    }
-
-    // /support
-    if (commandName === 'support') {
-      const supportEmbed = TRIGGERS.find(t => t.keyword === 'support').embed;
-      return interaction.reply({ embeds: [supportEmbed], components: [createSupportRow()], ephemeral: false });
-    }
-
-    // /ping
-    if (commandName === 'ping') {
-      const latency = Date.now() - createdTimestamp;
-      const pingEmbed = new EmbedBuilder()
-        .setTitle('🏓 Pong!')
-        .setThumbnail(THUMBNAIL_URL)
-        .setDescription(`Latency is **${latency}ms**\n\n🔗 [Bot Dashboard](${BOT_URL})`)
-        .setColor(0x00FFAA)
-        .setFooter({ text: 'CityMart Services' })
-        .setTimestamp();
-      return interaction.reply({ embeds: [pingEmbed], ephemeral: false });
-    }
-
-    // ─── NEW /ask COMMAND ────────────────────────────────────────────────
-    if (commandName === 'ask') {
-      const prompt = interaction.options.getString('prompt');
-      await interaction.deferReply();  // show “thinking…”
-
-      try {
-        const res = await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt })
-        });
-        if (!res.ok) throw new Error(`Worker returned ${res.status}`);
-        const replyText = await res.text();
-        return interaction.editReply(replyText);
-      } catch (err) {
-        console.error('ask → hallAI error:', err);
-        return interaction.editReply('❌ Sorry, I couldn’t reach hallAI. Try again later.');
+    // handle slash commands
+    switch (commandName) {
+      case 'keywords':
+        return interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
+      case 'community':
+      case 'experience':
+      case 'support':
+      case 'lorebook':
+      case 'lamp': {
+        const trigger = TRIGGERS.find(t => t.keyword === commandName);
+        const opts = {
+          content: `${user}`,
+          embeds: [trigger.embed],
+          ephemeral: false
+        };
+        if (commandName === 'support') opts.components = [createSupportRow()];
+        return interaction.reply(opts);
+      }
+      case 'ping': {
+        const latency = Date.now() - createdTimestamp;
+        const pingEmbed = new EmbedBuilder()
+          .setTitle('🏓 Pong!')
+          .setThumbnail(THUMBNAIL_URL)
+          .setDescription(`Latency is **${latency}ms**\n\n🔗 [Bot Dashboard](${BOT_URL})`)
+          .setColor(0x00FFAA)
+          .setFooter({ text: 'CityMart Services' })
+          .setTimestamp();
+        return interaction.reply({ embeds: [pingEmbed], ephemeral: false });
+      }
+      case 'ask': {
+        const prompt = interaction.options.getString('prompt');
+        await interaction.deferReply();
+        try {
+          const res = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+          });
+          const text = await res.text();
+          return interaction.editReply(text);
+        } catch {
+          return interaction.editReply('❌ Sorry, I couldn’t reach hallAI. Try again later.');
+        }
       }
     }
   } catch (err) {
     console.error('Error in interactionCreate:', err);
     if (interaction && !interaction.replied) {
-      interaction.reply({ content: '⚠️ An internal error occurred.', ephemeral: true });
+      interaction.reply({ content: '⚠️ An internal error occurred.', ephemeral: true }).catch(() => {});
     }
   }
 });
