@@ -1,0 +1,285 @@
+/* Reset and base */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+:root {
+  --primary-color: #38a34a;
+  --gradient-start: #2c2c34;
+  --gradient-end: #1a1a1f;
+  --text-color: #ffffff;
+  --text-secondary: rgba(255,255,255,0.7);
+  --discord-blue: #5865F2;
+  --main-radius: 32px;
+}
+
+/* Background particles */
+#particles-js {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* Body */
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+  overflow-y: auto;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+/* Card wrapper */
+.wrapper {
+  position: relative;
+  width: 90%;
+  max-width: 400px;
+  transition: transform 0.3s ease;
+  z-index: 1;
+}
+.wrapper:hover { transform: translateY(-5px); }
+
+/* Main container card (shared by both views) */
+#container {
+  background: linear-gradient(145deg, var(--gradient-start), var(--gradient-end));
+  border-radius: var(--main-radius);
+  padding: 2.5rem;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  min-height: 60vh;
+  margin-top: 64px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Loader */
+#spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255,255,255,0.3);
+  border-top-color: var(--text-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Logo intro anim */
+#logo {
+  width: 128px;
+  height: 128px;
+  opacity: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 2;
+}
+@keyframes logoMoveUp {
+  from { opacity: 0; transform: translate(-50%, 0); }
+  to { opacity: 1; transform: translate(-50%, -80px); }
+}
+.animate-logo { animation: logoMoveUp 1s ease-out forwards; }
+
+/* Content intro */
+#content {
+  opacity: 0;
+  position: relative;
+  width: 100%;
+  padding-top: 60px;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-content {
+  animation: fadeInUp 1s ease-out forwards;
+  animation-delay: 1s;
+}
+
+/* Typography */
+.title-group {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0;
+  font-weight: 700;
+}
+p {
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0.75rem 0;
+}
+#content p:nth-of-type(2) { margin-top: 1.5rem; }
+
+code {
+  background: rgba(255,255,255,0.1);
+  padding: 0.2em 0.4em;
+  border-radius: var(--main-radius);
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+/* Version pill */
+.version {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(56, 163, 74, 0.1);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--main-radius);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease;
+  vertical-align: middle;
+}
+.version:hover { background: rgba(56, 163, 74, 0.2); }
+
+/* Status */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(56, 163, 74, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  margin: 1rem 0;
+}
+.status-dot {
+  width: 10px;
+  height: 10px;
+  background: #38a34a;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+  box-shadow: 0 0 10px #38a34a;
+}
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; box-shadow: 0 0 10px #38a34a; }
+  50% { transform: scale(1.2); opacity: 0.8; box-shadow: 0 0 20px #38a34a; }
+  100% { transform: scale(1); opacity: 1; box-shadow: 0 0 10px #38a34a; }
+}
+
+/* Buttons row */
+#github-buttons {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.github-button { border-radius: var(--main-radius); }
+
+.discord-invite {
+  background: var(--discord-blue);
+  color: #fff;
+  padding: 0.5em 0.9em;
+  border-radius: var(--main-radius);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  border: none;
+}
+.discord-invite:hover { filter: brightness(1.1); }
+
+/* Privacy CTA in main view (styled like a link-button) */
+.privacy-link {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--main-radius);
+  background: rgba(0,0,0,0.2);
+  color: var(--text-color);
+  text-decoration: none;
+  transition: background 0.3s;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+}
+.privacy-link:hover { background: rgba(0,0,0,0.3); }
+
+/* Timestamp badge */
+#timestamp {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  padding: 0.5rem;
+  border-radius: var(--main-radius);
+  background: rgba(255,255,255,0.05);
+  display: inline-block;
+}
+
+/* VIEW TOGGLING (fade between main and privacy) */
+.view {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.view.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Privacy view helpers (from privacy.html) */
+.container {
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+}
+ul {
+  list-style: disc;
+  margin: 1rem 0;
+  padding-left: 1.5rem;
+  text-align: left;
+}
+a { color: var(--primary-color); }
+.back-button {
+  display: inline-block;
+  margin-top: 2rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.2);
+  color: var(--text-color);
+  text-decoration: none;
+  transition: background 0.3s;
+  border: none;
+  cursor: pointer;
+}
+.back-button:hover { background: rgba(0,0,0,0.3); }
+
+/* Responsive tweaks */
+@media (max-width: 480px) {
+  #container {
+    margin-top: 50px;
+    padding: 1.5rem;
+    min-height: 70vh;
+  }
+  h1 { font-size: 1.5rem; }
+  #logo { width: 100px; height: 100px; }
+}
+
+@media (max-height: 600px) {
+  #container {
+    margin: 2rem 0;
+    min-height: 50vh;
+  }
+}
