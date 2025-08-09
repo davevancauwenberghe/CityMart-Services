@@ -116,6 +116,9 @@ const TRIGGERS = [
   }
 ];
 
+// Pre-resolve the lamp trigger to avoid fragile array indexing
+const LAMP_TRIGGER = TRIGGERS.find(t => t.keyword === 'lamp');
+
 // Help embed
 const HELP_EMBED = new EmbedBuilder()
   .setTitle('CityMart Services Help')
@@ -179,13 +182,13 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // 1) Lamp embed fires anytime
-    if (TRIGGERS[4].regex.test(msg)) {
-      return message.channel.send({
-        content: `${message.author}`,
-        embeds: [TRIGGERS[4].embed]
-      });
-    }
+      // 1) Lamp embed fires anytime
+      if (LAMP_TRIGGER && LAMP_TRIGGER.regex.test(msg)) {
+        return message.channel.send({
+          content: `${message.author}`,
+          embeds: [LAMP_TRIGGER.embed]
+        });
+      }
 
     // 2) All others require a mention
     if (!message.mentions.has(client.user)) return;
@@ -228,7 +231,8 @@ client.on('messageCreate', async message => {
 
 client.on('interactionCreate', async interaction => {
   try {
-    if (!interaction.isCommand()) return;
+    // Slash commands are handled via chat input interactions
+    if (!interaction.isChatInputCommand()) return;
     const { commandName, createdTimestamp, user } = interaction;
 
     // Cooldown

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy - CityMart Services</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary-color: #38a34a;
+      --gradient-start: #2c2c34;
+      --gradient-end: #1a1a1f;
+      --text-color: #ffffff;
+    }
+    body {
+      background: linear-gradient(145deg, var(--gradient-start), var(--gradient-end));
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      text-align: center;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+    }
+    ul {
+      list-style: disc;
+      margin: 1rem 0;
+      padding-left: 1.5rem;
+      text-align: left;
+    }
+    a {
+      color: var(--primary-color);
+    }
+    .back-button {
+      display: inline-block;
+      margin-top: 2rem;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.2);
+      color: var(--text-color);
+      text-decoration: none;
+      transition: background 0.3s;
+    }
+    .back-button:hover {
+      background: rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p>CityMart Services relies on external platforms. Please review their policies:</p>
+    <ul>
+      <li>hallAI uses the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>. Host only forwards requests to OpenAI.</li>
+      <li>The CityMart Services Discord bot communicates with the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
+    </ul>
+    <a class="back-button" href="index.html">Back</a>
+  </div>
+</body>
+</html>
