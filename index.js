@@ -13,23 +13,59 @@ const http = require('http');
 const fs   = require('fs');
 const path = require('path');
 
-// Simple cooldown tracker
+// ---------------------- Cooldowns & Rate Limits ----------------------
 const userCooldowns = new Map();
-const COOLDOWN_MS    = 5000;
+const COOLDOWN_MS   = 5000; // generic per-user cooldown for mentions/slash
 
-// Environment sanity
+// /ask-specific burst limit: 5 reqs / 60s per (guild:channel:user)
+const ASK_WINDOW_MS = 60_000;
+const ASK_MAX       = 5;
+const askBuckets    = new Map(); // key -> [timestamps]
+
+// tiny in-memory history for /ask (per conversation)
+const MAX_TURNS   = 8; // 8 user+assistant pairs
+const askHistory  = new Map(); // key -> [{role, content}, ...]
+function askKey(guildId, channelId, userId) {
+  return `${guildId}:${channelId}:${userId}`;
+}
+function allowAsk(key) {
+  const now = Date.now();
+  const arr = (askBuckets.get(key) || []).filter(ts => now - ts < ASK_WINDOW_MS);
+  if (arr.length >= ASK_MAX) return false;
+  arr.push(now);
+  askBuckets.set(key, arr);
+  return true;
+}
+function getHistory(key) {
+  return askHistory.get(key) || [];
+}
+function pushTurn(key, userText, assistantText) {
+  const prev = getHistory(key);
+  const next = [...prev, { role: 'user', content: userText }, { role: 'assistant', content: assistantText }];
+  askHistory.set(key, next.slice(-MAX_TURNS * 2));
+}
+
+// Periodic cleanup of stale maps (memory hygiene)
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000; // 1h
+  for (const [uid, ts] of userCooldowns) if (ts < cutoff) userCooldowns.delete(uid);
+
+  for (const [key, stamps] of askBuckets) {
+    const pruned = stamps.filter(t => Date.now() - t < ASK_WINDOW_MS);
+    if (pruned.length) askBuckets.set(key, pruned);
+    else askBuckets.delete(key);
+  }
+  // (askHistory left as-is so context persists while bot runs)
+}, 30 * 60 * 1000);
+
+// ---------------------- Environment ----------------------
 const GUILD_ID   = process.env.GUILD_ID;
-const WORKER_URL = process.env.WORKER_URL; // your hallAI Worker URL
-if (!process.env.DISCORD_TOKEN) {
-  console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
-}
-if (!GUILD_ID) {
-  console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
-}
-if (!WORKER_URL) {
-  console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
-}
+const WORKER_URL = process.env.WORKER_URL; // hallAI Worker URL
+if (!process.env.DISCORD_TOKEN) console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
+if (!GUILD_ID)                   console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
+if (!WORKER_URL)                 console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
 
+// ---------------------- Discord Client ----------------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -38,7 +74,7 @@ const client = new Client({
   ]
 });
 
-// Constants
+// ---------------------- Constants ----------------------
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
 const BOT_URL            = 'https://citymart-bot.fly.dev/';
 const THUMBNAIL_URL      = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
@@ -52,10 +88,10 @@ const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI
 // Reaction keywords
 const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
 
-// Utility to escape regex special chars
+// Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
-// Build triggers with precompiled regex + embeds
+// ---------------------- Triggers ----------------------
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -116,10 +152,9 @@ const TRIGGERS = [
   }
 ];
 
-// Pre-resolve the lamp trigger to avoid fragile array indexing
 const LAMP_TRIGGER = TRIGGERS.find(t => t.keyword === 'lamp');
 
-// Help embed
+// ---------------------- Help Embed ----------------------
 const HELP_EMBED = new EmbedBuilder()
   .setTitle('CityMart Services Help')
   .setThumbnail(THUMBNAIL_URL)
@@ -127,22 +162,14 @@ const HELP_EMBED = new EmbedBuilder()
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
     { name: '🔗 Roblox Links', value: 'community\nexperience',      inline: false },
-    { name: '🆘 Support',        value: 'support',                   inline: false },
-    { name: '📖 Misc',           value: 'lorebook\nlamp\nping\nask', inline: false },
-    { name: '🔗 Dashboard',      value: `[Bot Dashboard](${BOT_URL})`, inline: false }
+    { name: '🆘 Support',      value: 'support',                     inline: false },
+    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',   inline: false },
+    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`, inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
 
-// Periodic cleanup of stale cooldown entries
-setInterval(() => {
-  const cutoff = Date.now() - 60 * 60 * 1000; // 1 hour
-  for (const [uid, ts] of userCooldowns.entries()) {
-    if (ts < cutoff) userCooldowns.delete(uid);
-  }
-}, 30 * 60 * 1000);
-
-// Support button helper
+// ---------------------- Helpers ----------------------
 function createSupportRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -153,6 +180,7 @@ function createSupportRow() {
   );
 }
 
+// ---------------------- Lifecycle ----------------------
 client.once('ready', () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   client.user.setPresence({
@@ -161,11 +189,12 @@ client.once('ready', () => {
   });
 });
 
+// ---------------------- Mention-based keywords ----------------------
 client.on('messageCreate', async message => {
   try {
     if (message.author.bot || !message.guild) return;
 
-    // Cooldown
+    // Generic cooldown
     const now  = Date.now();
     const last = userCooldowns.get(message.author.id) || 0;
     if (now - last < COOLDOWN_MS) return;
@@ -173,7 +202,7 @@ client.on('messageCreate', async message => {
 
     const msg = message.content.toLowerCase();
 
-    // Reaction logic
+    // React with emoji (lamp gets lamp emoji)
     for (const word of REACTION_KEYWORDS) {
       if (msg.includes(word)) {
         const emojiToUse = word === 'lamp' ? LAMP_EMOJI : CITYMART_EMOJI;
@@ -182,18 +211,18 @@ client.on('messageCreate', async message => {
       }
     }
 
-      // 1) Lamp embed fires anytime
-      if (LAMP_TRIGGER && LAMP_TRIGGER.regex.test(msg)) {
-        return message.channel.send({
-          content: `${message.author}`,
-          embeds: [LAMP_TRIGGER.embed]
-        });
-      }
+    // Lamp embed fires anytime (no mention required)
+    if (LAMP_TRIGGER && LAMP_TRIGGER.regex.test(msg)) {
+      return message.channel.send({
+        content: `${message.author}`,
+        embeds: [LAMP_TRIGGER.embed]
+      });
+    }
 
-    // 2) All others require a mention
+    // Other keywords require mention
     if (!message.mentions.has(client.user)) return;
 
-    // 3) Ping mention-based
+    // Ping (mention-based)
     if (/\bping\b/i.test(msg)) {
       const latency = Date.now() - message.createdTimestamp;
       const pingEmbed = new EmbedBuilder()
@@ -206,7 +235,7 @@ client.on('messageCreate', async message => {
       return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
     }
 
-    // 4) Other keyword triggers
+    // Other triggers
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
       if (trigger.regex.test(msg)) {
@@ -219,23 +248,20 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // 5) Fallback: help embed
-    await message.channel.send({
-      content: `${message.author}`,
-      embeds: [HELP_EMBED]
-    });
+    // Fallback: help embed
+    await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
   } catch (err) {
     console.error('Error in messageCreate:', err);
   }
 });
 
+// ---------------------- Slash commands ----------------------
 client.on('interactionCreate', async interaction => {
   try {
-    // Slash commands are handled via chat input interactions
     if (!interaction.isChatInputCommand()) return;
-    const { commandName, createdTimestamp, user } = interaction;
+    const { commandName, createdTimestamp, user, guildId, channelId } = interaction;
 
-    // Cooldown
+    // Generic per-user cooldown
     const now  = Date.now();
     const last = userCooldowns.get(user.id) || 0;
     if (now - last < COOLDOWN_MS) {
@@ -243,10 +269,10 @@ client.on('interactionCreate', async interaction => {
     }
     userCooldowns.set(user.id, now);
 
-    // handle slash commands
     switch (commandName) {
       case 'keywords':
         return interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
+
       case 'community':
       case 'experience':
       case 'support':
@@ -261,6 +287,7 @@ client.on('interactionCreate', async interaction => {
         if (commandName === 'support') opts.components = [createSupportRow()];
         return interaction.reply(opts);
       }
+
       case 'ping': {
         const latency = Date.now() - createdTimestamp;
         const pingEmbed = new EmbedBuilder()
@@ -272,18 +299,55 @@ client.on('interactionCreate', async interaction => {
           .setTimestamp();
         return interaction.reply({ embeds: [pingEmbed], ephemeral: false });
       }
+
+      // hallAI bridge
       case 'ask': {
-        const prompt = interaction.options.getString('prompt');
-        await interaction.deferReply();
+        const prompt = interaction.options.getString('prompt', true);
+
+        // /ask burst limit per conversation
+        const key = askKey(guildId, channelId, user.id);
+        if (!allowAsk(key)) {
+          return interaction.reply({
+            content: '🚦 Rate limit: max 5 questions per minute for this conversation. Please try again in a bit.',
+            ephemeral: true
+          });
+        }
+
+        await interaction.deferReply(); // show "thinking…"
+
+        // Build conversation context
+        const history = getHistory(key);
+        const messages = [
+          // Keep system here for reliability; Worker can ignore or de-dup
+          { role: 'system', content: "You are hallAI, a retro terminal AI assistant built by Dave Van Cauwenberghe and launched on Thursday, 7 August 2025. Be helpful, nerdy, concise with a touch of sensitivity and witty humor. Use markdown where useful. You're running on gpt-4.1-nano" },
+          ...history,
+          { role: 'user', content: prompt }
+        ];
+
         try {
           const res = await fetch(WORKER_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
+            body: JSON.stringify({
+              // Keep 'prompt' for backward compat if Worker still expects it:
+              prompt,
+              // New fields (safe to send even if Worker ignores them):
+              identifier: key,
+              messages
+            })
           });
+
+          if (!res.ok) throw new Error(`Worker returned ${res.status}`);
           const text = await res.text();
-          return interaction.editReply(text);
-        } catch {
+
+          // Save this turn locally
+          pushTurn(key, prompt, text);
+
+          // Discord 2k char safety
+          const reply = text.length > 2000 ? text.slice(0, 1990) + '…' : text;
+          return interaction.editReply(reply);
+        } catch (err) {
+          console.error('ask → hallAI error:', err);
           return interaction.editReply('❌ Sorry, I couldn’t reach hallAI. Try again later.');
         }
       }
@@ -298,7 +362,7 @@ client.on('interactionCreate', async interaction => {
 
 client.login(process.env.DISCORD_TOKEN);
 
-// ─── Simple HTTP server for landing page ───────────────────────────────
+// ---------------------- Tiny landing page server ----------------------
 const PORT = process.env.PORT || 8080;
 http
   .createServer((req, res) => {

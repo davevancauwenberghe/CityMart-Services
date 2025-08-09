@@ -13,35 +13,44 @@ const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 const commands = [
   new SlashCommandBuilder()
     .setName('keywords')
-    .setDescription('View keywords available with CityMart Services'),
+    .setDescription('Show all keywords and slash commands for CityMart Services'),
+
   new SlashCommandBuilder()
     .setName('support')
-    .setDescription('Get help and support information'),
+    .setDescription('Get help and jump to the support channel'),
+
   new SlashCommandBuilder()
     .setName('ping')
     .setDescription('Check the bot latency'),
+
   new SlashCommandBuilder()
     .setName('community')
-    .setDescription('Get the CityMart Group Roblox community link'),
+    .setDescription('Get the CityMart Group Roblox Community link'),
+
   new SlashCommandBuilder()
     .setName('experience')
     .setDescription('Get the CityMart Shopping Experience link'),
+
   new SlashCommandBuilder()
     .setName('lorebook')
     .setDescription('Open the CityMart Lore Book'),
+
   new SlashCommandBuilder()
     .setName('lamp')
-    .setDescription('Discover the mysterious lamp'),
+    .setDescription("Shh... the lamp doesn't exist"),
+
+  // hallAI bridge
   new SlashCommandBuilder()
     .setName('ask')
     .setDescription('Ask hallAI a question')
-    .addStringOption(option =>
-      option
+    .addStringOption(opt =>
+      opt
         .setName('prompt')
-        .setDescription('Enter your question for hallAI')
+        .setDescription('Your question for hallAI')
         .setRequired(true)
+        .setMaxLength(1000)
     )
-].map(cmd => cmd.toJSON());
+].map(c => c.toJSON());
 
 // Set up REST client
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
