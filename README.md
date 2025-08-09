@@ -4,17 +4,25 @@
 ![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow.svg)
 ![Docker](https://img.shields.io/badge/Container-Docker-blue.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
-![GitHub Stars](https://img.shields.io/github/stars/davevancauwenberghe/Citymart-Services)
+![GitHub Stars](https://img.shields.io/github/stars/davevancauwenberghe/CityMart-Services)
 
-A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services <keyword>" and replies with rich embeds for commands like "community", "experience", "support", and "lorebook".
+A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services <keyword>" and replies with rich embeds for commands like "community", "experience", "support", "lorebook", "keywords", "lamp", "ping", and "ask".
 
 ## 🚀 Getting Started
 
 **Fork** this repository on GitHub, then follow the installation steps below.
 
+```bash
+git clone https://github.com/davevancauwenberghe/CityMart-Services.git
+cd CityMart-Services
+npm install
+```
+
+Create a `.env` file with your `DISCORD_TOKEN` and other optional variables like `GUILD_ID` and `WORKER_URL` before starting the bot.
+
 ## 🔧 Prerequisites
 
-- [Node.js](https://nodejs.org/) v16.9+  
+- [Node.js](https://nodejs.org/) v18+
 - [Docker](https://www.docker.com/) (for container builds)  
 - A Discord Bot token with **Message Content Intent** enabled  
 
