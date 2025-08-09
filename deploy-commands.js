@@ -1,15 +1,15 @@
 require('dotenv').config();
-const chalk = require('chalk');
 const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
-// Validate required env vars
+// Validate required environment variables
 ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID'].forEach(name => {
   if (!process.env[name]) {
-    console.error(chalk.bgRed.white(`❌ Missing environment variable: ${name}`));
+    console.error(`❌ Missing environment variable: ${name}`);
     process.exit(1);
   }
 });
 
+// Define commands with consistent naming/descriptions
 const commands = [
   new SlashCommandBuilder()
     .setName('keywords')
@@ -43,13 +43,13 @@ const commands = [
     )
 ].map(cmd => cmd.toJSON());
 
+// Set up REST client
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
+// Deploy commands with timestamped logging
 (async () => {
   try {
-    console.log(
-      chalk.cyan(`[${new Date().toISOString()}] 🔄 Refreshing application slash commands...`)
-    );
+    console.log(`[${new Date().toISOString()}] 🔄 Refreshing application slash commands...`);
     await rest.put(
       Routes.applicationGuildCommands(
         process.env.CLIENT_ID,
@@ -57,13 +57,8 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
       ),
       { body: commands }
     );
-    console.log(
-      chalk.green(`[${new Date().toISOString()}] ✅ Successfully registered ${commands.length} slash commands.`)
-    );
+    console.log(`[${new Date().toISOString()}] ✅ Successfully registered ${commands.length} slash commands.`);
   } catch (err) {
-    console.error(
-      chalk.red(`[${new Date().toISOString()}] ❌ Error registering slash commands:`),
-      err
-    );
+    console.error(`[${new Date().toISOString()}] ❌ Error registering slash commands:`, err);
   }
 })();
