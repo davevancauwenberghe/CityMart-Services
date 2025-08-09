@@ -4,7 +4,8 @@
   "description": "Discord bot for CityMart Group server",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "discord.js": "^14.0.0",
