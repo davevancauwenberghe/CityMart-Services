@@ -53,9 +53,7 @@ const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI
 const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
 
 // Utility to escape regex special chars
-function escapeForRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+const escapeForRegex = require('./utils/escapeForRegex');
 
 // Build triggers with precompiled regex + embeds
 const TRIGGERS = [
