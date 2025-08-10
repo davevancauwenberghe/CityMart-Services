@@ -13,7 +13,7 @@
   <div id="particles-js"></div>
 
   <!-- MAIN VIEW -->
-  <div class="wrapper view active" id="landing-view">
+  <div class="wrapper" id="landing-view">
     <img id="logo" src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" alt="CityMart Logo" loading="eager" />
     <div id="container">
       <div id="spinner"></div>
@@ -39,18 +39,16 @@
     </div>
   </div>
 
-  <!-- PRIVACY POLICY VIEW -->
-  <div class="wrapper view" id="privacy-view">
-    <div id="container">
-      <div class="container">
-        <h1>Privacy Policy</h1>
-        <p>CityMart Services relies on external platforms. Please review their policies:</p>
-        <ul>
-          <li>hallAI uses the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>. Host only forwards requests to OpenAI.</li>
-          <li>The CityMart Services Discord bot communicates with the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
-        </ul>
-        <button class="back-button" id="back-to-main">← Back</button>
-      </div>
+  <!-- PRIVACY POLICY MODAL -->
+  <div id="privacy-modal">
+    <div class="modal-content">
+      <span id="close-privacy">&times;</span>
+      <h2>Privacy Policy</h2>
+      <p>CityMart Services relies on external platforms. Please review their policies:</p>
+      <ul>
+        <li>hallAI uses the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>. The host only forwards requests to OpenAI.</li>
+        <li>The CityMart Services Discord bot communicates with the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
+      </ul>
     </div>
   </div>
 

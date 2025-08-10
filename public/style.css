@@ -37,6 +37,11 @@ body {
   padding: 1rem;
 }
 
+/* Prevent background scroll when modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
 /* Card wrapper */
 .wrapper {
   position: relative;
@@ -47,7 +52,7 @@ body {
 }
 .wrapper:hover { transform: translateY(-5px); }
 
-/* Main container card (shared by both views) */
+/* Main container card */
 #container {
   background: linear-gradient(145deg, var(--gradient-start), var(--gradient-end));
   border-radius: var(--main-radius);
@@ -201,7 +206,7 @@ code {
 }
 .discord-invite:hover { filter: brightness(1.1); }
 
-/* Privacy CTA in main view (styled like a link-button) */
+/* Privacy CTA in main view */
 .privacy-link {
   display: inline-block;
   margin-top: 1.5rem;
@@ -228,69 +233,38 @@ code {
   display: inline-block;
 }
 
-/* VIEW TOGGLING (fade between main and privacy) */
-.view {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
+/* ===== MODAL OVERLAY FOR PRIVACY POLICY ===== */
+#privacy-modal {
+  display: flex;               /* Always flex for animation; hide via opacity & pointer events */
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;        /* Prevent clicks when invisible */
   opacity: 0;
-  pointer-events: none;
-  transform: translateX(30px);
-  filter: blur(4px);
+  background: rgba(0,0,0,0.0); /* Start with transparent backdrop */
+  backdrop-filter: blur(0px);  /* No blur at start */
   transition:
-    opacity 0.6s ease,
-    transform 0.6s ease,
-    filter 0.6s ease;
+    background 0.3s ease,
+    backdrop-filter 0.3s ease,
+    opacity 0.3s ease;
 }
-.view.active {
+
+#privacy-modal.open {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0);
-  filter: blur(0);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(6px);
 }
 
-/* Privacy view helpers (from privacy.html) */
-.container {
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-}
-ul {
-  list-style: disc;
-  margin: 1rem 0;
-  padding-left: 1.5rem;
-  text-align: left;
-}
-a { color: var(--primary-color); }
-.back-button {
-  display: inline-block;
-  margin-top: 2rem;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  background: rgba(0,0,0,0.2);
-  color: var(--text-color);
-  text-decoration: none;
-  transition: background 0.3s;
-  border: none;
-  cursor: pointer;
-}
-.back-button:hover { background: rgba(0,0,0,0.3); }
-
-/* Responsive tweaks */
-@media (max-width: 480px) {
-  #container {
-    margin-top: 50px;
-    padding: 1.5rem;
-    min-height: 70vh;
-  }
-  h1 { font-size: 1.5rem; }
-  #logo { width: 100px; height: 100px; }
+/* Modal content anim — delayed so backdrop appears first */
+.modal-content {
+  transform: translateY(20px);
+  opacity: 0;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.15s,
+    opacity 0.4s ease 0.15s; /* 0.15s delay to let backdrop start */
 }
 
-@media (max-height: 600px) {
-  #container {
-    margin: 2rem 0;
-    min-height: 50vh;
-  }
+#privacy-modal.open .modal-content {
+  transform: translateY(0);
+  opacity: 1;
 }
