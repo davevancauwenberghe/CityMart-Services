@@ -21,6 +21,10 @@ primary_region = "ams"
     soft_limit = 200
     hard_limit = 250
 
+[[statics]]
+  guest_path = "/app/public"
+  url_prefix = "/"
+
 [[vm]]
   memory     = "256mb"
   cpu_kind   = "shared"
