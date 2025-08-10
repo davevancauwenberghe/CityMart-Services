@@ -230,13 +230,24 @@ code {
 
 /* VIEW TOGGLING (fade between main and privacy) */
 .view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.5s ease;
+  transform: translateX(30px);
+  filter: blur(4px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease,
+    filter 0.6s ease;
 }
 .view.active {
   opacity: 1;
   pointer-events: auto;
+  transform: translateX(0);
+  filter: blur(0);
 }
 
 /* Privacy view helpers (from privacy.html) */
