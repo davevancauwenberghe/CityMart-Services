@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Privacy Policy - CityMart Services Bot" />
+  <meta name="theme-color" content="#38a34a" />
+  <link rel="icon" href="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" type="image/png" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Privacy Policy - CityMart Services</title>
+  <style>
+    /* Page fade-in that matches your vibe */
+    .page-fade { opacity: 0; transform: translateY(10px); animation: pageFade 500ms ease-out forwards; }
+    @keyframes pageFade { to { opacity: 1; transform: translateY(0); } }
+
+    /* Minimal button styles that blend with your theme */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0.6rem 1rem; border-radius: 12px; border: none; cursor: pointer;
+      text-decoration: none; font-weight: 600; line-height: 1; gap: .5rem;
+      color: #fff; background: rgba(255,255,255,0.12);
+      transition: filter .2s ease, background .2s ease;
+    }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-ghost { background: rgba(255,255,255,0.08); color: #fff; }
+    .btn-row { margin-top: 2rem; display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+    .content-narrow { text-align: left; margin: 0 auto; max-width: 36ch; }
+    #container h1 { text-align: center; margin-bottom: .5rem; }
+    #container p.lead { text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; }
+    #container ul { margin-left: 1.25rem; }
+    #container h2 { margin-top: 1.25rem; margin-bottom: .25rem; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <div id="particles-js"></div>
+
+  <div class="wrapper page-fade">
+    <div id="container">
+      <h1>Privacy Policy</h1>
+      <p class="lead">Last updated: August 2025</p>
+
+      <div class="content-narrow">
+        <p>
+          CityMart Services operates as a Discord bot for the CityMart Group and may interact with external services
+          to provide features.
+        </p>
+
+        <h2>Data Handling</h2>
+        <ul>
+          <li>No personal data is permanently stored by the bot.</li>
+          <li>Messages sent to the bot are processed in-memory and may be relayed to third-party APIs for generating responses.</li>
+          <li>hallAI requests are processed via the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>, using a Cloudflare Worker as a proxy.</li>
+          <li>Discord messages and commands are processed using the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
+        </ul>
+
+        <h2>Your Rights</h2>
+        <p>
+          If you wish to have all conversation data associated with your session removed, please contact the server administrator
+          or use any provided in-bot command for data deletion (if available).
+        </p>
+      </div>
+
+      <div class="btn-row">
+        <a class="btn btn-ghost" href="index.html">⬅ Home</a>
+        <a class="btn btn-ghost" href="tos.html">Terms of Service</a>
+        <button class="btn" id="history-back">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+  <script>
+    // Particles only (kept minimal and matching your index settings)
+    if (window.particlesJS) {
+      particlesJS('particles-js', {
+        particles: {
+          number: { value: 50, density: { enable: true, value_area: 800 } },
+          color: { value: "#38a34a" },
+          shape: { type: "circle" },
+          opacity: { value: 0.2 },
+          size: { value: 3, random: true },
+          line_linked: { enable: true, distance: 150, color: "#38a34a", opacity: 0.1, width: 1 },
+          move: { enable: true, speed: 2 }
+        },
+        interactivity: { events: { onhover: { enable: true, mode: "repulse" }, resize: true } },
+        retina_detect: true
+      });
+    }
+    // Dedicated back button
+    document.getElementById('history-back')?.addEventListener('click', () => {
+      if (history.length > 1) history.back(); else window.location.href = 'index.html';
+    });
+  </script>
+</body>
+</html>
