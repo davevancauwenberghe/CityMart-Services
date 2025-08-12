@@ -4,14 +4,14 @@ window.addEventListener('DOMContentLoaded', () => {
   const content  = document.getElementById('content');
   const tsEl     = document.getElementById('timestamp');
 
-  // Particles config
+  // Particles
   if (window.particlesJS) {
     particlesJS('particles-js', {
       particles: {
         number: { value: 50, density: { enable: true, value_area: 800 } },
         color: { value: "#38a34a" },
         shape: { type: "circle" },
-        opacity: { value: 0.2, random: false },
+        opacity: { value: 0.2 },
         size: { value: 3, random: true },
         line_linked: { enable: true, distance: 150, color: "#38a34a", opacity: 0.1, width: 1 },
         move: { enable: true, speed: 2 }
@@ -21,7 +21,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Timestamp updater (Europe/Brussels)
+  // Timestamp
   function updateTimestamp() {
     const now = new Date();
     const brussels = now.toLocaleString('en-GB', {
