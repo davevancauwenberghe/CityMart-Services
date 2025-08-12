@@ -76,6 +76,7 @@ const client = new Client({
 
 // ---------------------- Constants ----------------------
 const SUPPORT_CHANNEL_ID = '1385699550005694586';
+const GENERAL_CHANNEL_ID = '1385065666637201462'; // for the "I'm back" message
 const BOT_URL            = 'https://citymart-bot.fly.dev/';
 const THUMBNAIL_URL      = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
 
@@ -181,12 +182,43 @@ function createSupportRow() {
 }
 
 // ---------------------- Lifecycle ----------------------
-client.once('ready', () => {
+client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
   client.user.setPresence({
     activities: [{ name: 'CityMart Shoppers 🛒', type: ActivityType.Watching }],
     status: 'online'
   });
+
+  // Fun randomized "I'm back!" message to #general
+  const comebackLines = [
+    "Beep boop, system reboot complete. I'm back online!",
+    "Well, that was a nice nap. Ready to serve again! 🛒",
+    "Guess who just reconnected? Hint: it’s me.",
+    "Downtime? Never heard of her. Let’s go!",
+    "CityMart Services are a go! 🚀",
+    "Apologies for the brief AFK, just didn't feel like it.",
+    "And we're back! Time to get shopping!"
+  ];
+  const randomMessage = comebackLines[Math.floor(Math.random() * comebackLines.length)];
+
+  try {
+    const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+    if (channel?.isTextBased()) {
+      const embed = new EmbedBuilder()
+        .setColor('#38a34a')
+        .setTitle(randomMessage)
+        .setDescription('Your friendly CityMart Services bot is back online after an update or restart.')
+        .setThumbnail(THUMBNAIL_URL)
+        .setFooter({
+          text: `Uptime started: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/Brussels' })}`
+        })
+        .setTimestamp();
+
+      await channel.send({ embeds: [embed] });
+    }
+  } catch (err) {
+    console.error('⚠️ Could not send comeback message:', err);
+  }
 });
 
 // ---------------------- Mention-based keywords ----------------------
@@ -318,7 +350,6 @@ client.on('interactionCreate', async interaction => {
         // Build conversation context
         const history = getHistory(key);
         const messages = [
-          // Keep system here for reliability; Worker can ignore or de-dup
           { role: 'system', content: "You are hallAI, a retro terminal AI assistant built by Dave Van Cauwenberghe and launched on Thursday, 7 August 2025. Be helpful, nerdy, concise with a touch of sensitivity and witty humor. Use markdown where useful. You're running on gpt-4.1-nano" },
           ...history,
           { role: 'user', content: prompt }
@@ -329,11 +360,9 @@ client.on('interactionCreate', async interaction => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              // Keep 'prompt' for backward compat if Worker still expects it:
-              prompt,
-              // New fields (safe to send even if Worker ignores them):
-              identifier: key,
-              messages
+              prompt,           // for backward compatibility
+              identifier: key,  // worker can use this if desired
+              messages          // optional; worker can ignore
             })
           });
 
