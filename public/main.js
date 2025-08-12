@@ -1,34 +1,8 @@
 window.addEventListener('DOMContentLoaded', () => {
-  const spinner = document.getElementById('spinner');
-  const logo = document.getElementById('logo');
-  const content = document.getElementById('content');
-  const tsEl = document.getElementById('timestamp');
-
-  // Modal elements
-  const privacyModal = document.getElementById('privacy-modal');
-  const showPrivacy = document.getElementById('show-privacy');
-  const closePrivacy = document.getElementById('close-privacy');
-
-  // Open modal
-  showPrivacy.addEventListener('click', e => {
-    e.preventDefault();
-    privacyModal.classList.add('open');
-    document.body.classList.add('modal-open');
-  });
-
-  // Close modal (via X button)
-  closePrivacy.addEventListener('click', () => {
-    privacyModal.classList.remove('open');
-    document.body.classList.remove('modal-open');
-  });
-
-  // Close modal (click outside content)
-  privacyModal.addEventListener('click', e => {
-    if (e.target === privacyModal) {
-      privacyModal.classList.remove('open');
-      document.body.classList.remove('modal-open');
-    }
-  });
+  const spinner  = document.getElementById('spinner');
+  const logo     = document.getElementById('logo');
+  const content  = document.getElementById('content');
+  const tsEl     = document.getElementById('timestamp');
 
   // Particles config
   if (window.particlesJS) {
@@ -47,17 +21,13 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Timestamp updater
+  // Timestamp updater (Europe/Brussels)
   function updateTimestamp() {
     const now = new Date();
     const brussels = now.toLocaleString('en-GB', {
       timeZone: 'Europe/Brussels',
-      year: 'numeric',
-      month: 'long',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      year: 'numeric', month: 'long', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false
     });
     tsEl.textContent = `Bot time — ${brussels}`;
