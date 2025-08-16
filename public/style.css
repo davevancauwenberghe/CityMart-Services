@@ -196,6 +196,17 @@ code {
   grid-template-columns: 1fr;
   gap: .6rem;
 }
+.back-btn {
+  background: var(--primary-color);
+  color: #fff;
+  padding: .6rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.back-btn:hover {
+  background: #2d8a3e;
+}
+
 @media (min-width: 420px) {
   .btn-row { grid-template-columns: 1fr 1fr; }
 }
