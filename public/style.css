@@ -159,12 +159,28 @@ code {
     align-items: center;
   }
 }
-.github-button { border-radius: 10px; }
+#github-buttons {
+  margin-top: 1.25rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr; 
+  gap: .6rem;
+}
+
+.github-button {
+  border-radius: 10px;
+  text-align: center;   
+  padding: 0.5rem 1rem; 
+  width: 100%;          
+}
+
 .discord-invite {
   background: var(--discord-blue); color: #fff;
   padding: .55em .9em; border-radius: 10px; font-weight: 600;
-  text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+  text-decoration: none; display: block; align-items: center; gap: 6px;
   font-size: .92rem; white-space: nowrap; border: none;
+   margin: 0.8rem auto 0;   
+  width: fit-content;      
+  text-align: center; 
 }
 .discord-invite:hover { filter: brightness(1.06); }
 
@@ -196,6 +212,17 @@ code {
   grid-template-columns: 1fr;
   gap: .6rem;
 }
+.back-btn {
+  background: var(--primary-color);
+  color: #fff;
+  padding: .6rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.back-btn:hover {
+  background: #2d8a3e;
+}
+
 @media (min-width: 420px) {
   .btn-row { grid-template-columns: 1fr 1fr; }
 }
