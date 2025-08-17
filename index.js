@@ -92,11 +92,35 @@ const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
+// ---------------------- Helpers ----------------------
+function createSupportRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('Go to Support')
+      .setEmoji('❓')
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
+  );
+}
+
+// Generic link row for URL-based commands
+function createLinkRow(url, label) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel(label)
+      .setStyle(ButtonStyle.Link)
+      .setURL(url)
+  );
+}
+
 // ---------------------- Triggers ----------------------
+// Each trigger can optionally include `url` + `buttonLabel` to show a link button
 const TRIGGERS = [
   {
     keyword: 'community',
     regex: new RegExp(`\\b${escapeForRegex('community')}\\b`, 'i'),
+    url: 'https://www.roblox.com/communities/36060455/CityMart-Group#!/about',
+    buttonLabel: 'Open Roblox Community',
     embed: new EmbedBuilder()
       .setTitle('CityMart Community')
       .setThumbnail(THUMBNAIL_URL)
@@ -107,11 +131,25 @@ const TRIGGERS = [
   {
     keyword: 'experience',
     regex: new RegExp(`\\b${escapeForRegex('experience')}\\b`, 'i'),
+    url: 'https://www.roblox.com/games/84931510725955/CityMart-Shopping',
+    buttonLabel: 'Open Experience',
     embed: new EmbedBuilder()
       .setTitle('CityMart Shopping Experience')
       .setThumbnail(THUMBNAIL_URL)
       .setDescription('Ready for a shopping spree? 🛒 Visit our virtual CityMart store on Roblox and explore hundreds of items!')
       .setURL('https://www.roblox.com/games/84931510725955/CityMart-Shopping')
+      .setTimestamp()
+  },
+  {
+    keyword: 'application',
+    regex: new RegExp(`\\b${escapeForRegex('application')}\\b`, 'i'),
+    url: 'https://www.roblox.com/games/138757153564625/CityMart-Application-Centre',
+    buttonLabel: 'Open Application Centre',
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Application Centre')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription('Take the 10-question quiz and become a CityMart Trainee!')
+      .setURL('https://www.roblox.com/games/138757153564625/CityMart-Application-Centre')
       .setTimestamp()
   },
   {
@@ -125,8 +163,22 @@ const TRIGGERS = [
       .setTimestamp()
   },
   {
+    keyword: 'documentation',
+    regex: new RegExp(`\\b${escapeForRegex('documentation')}\\b`, 'i'),
+    url: 'https://citymartgroup.gitbook.io/docs/',
+    buttonLabel: 'Open Documentation',
+    embed: new EmbedBuilder()
+      .setTitle('CityMart Documentation')
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription('Browse the official CityMart documentation on GitBook.')
+      .setURL('https://citymartgroup.gitbook.io/docs/')
+      .setTimestamp()
+  },
+  {
     keyword: 'lorebook',
     regex: new RegExp(`\\b${escapeForRegex('lorebook')}\\b`, 'i'),
+    url: 'https://nervous-flag-247.notion.site/23eee5e2e2ec800db586cd84bf80cbf2?v=23eee5e2e2ec804aa1b3000c2018e0b9',
+    buttonLabel: 'Open Lorebook',
     embed: new EmbedBuilder()
       .setTitle('CityMart Lore Book')
       .setThumbnail(THUMBNAIL_URL)
@@ -162,24 +214,13 @@ const HELP_EMBED = new EmbedBuilder()
   .setColor(0x00FFAA)
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
-    { name: '🔗 Roblox Links', value: 'community\nexperience',      inline: false },
-    { name: '🆘 Support',      value: 'support',                     inline: false },
-    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',   inline: false },
-    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`, inline: false }
+    { name: '🔗 Roblox Links', value: 'community\nexperience\napplication',      inline: false },
+    { name: '🆘 Support',      value: 'support\ndocumentation',                  inline: false },
+    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',                inline: false },
+    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`,             inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
-
-// ---------------------- Helpers ----------------------
-function createSupportRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel('Go to Support')
-      .setEmoji('❓')
-      .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
-  );
-}
 
 // ---------------------- Lifecycle ----------------------
 client.once('ready', async () => {
@@ -271,7 +312,12 @@ client.on('messageCreate', async message => {
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
       if (trigger.regex.test(msg)) {
-        const components = trigger.keyword === 'support' ? [createSupportRow()] : [];
+        let components = [];
+        if (trigger.keyword === 'support') {
+          components = [createSupportRow()];
+        } else if (trigger.url && trigger.buttonLabel) {
+          components = [createLinkRow(trigger.url, trigger.buttonLabel)];
+        }
         return message.channel.send({
           content: `${message.author}`,
           embeds: [trigger.embed],
@@ -307,6 +353,8 @@ client.on('interactionCreate', async interaction => {
 
       case 'community':
       case 'experience':
+      case 'application':
+      case 'documentation':
       case 'support':
       case 'lorebook':
       case 'lamp': {
@@ -316,7 +364,11 @@ client.on('interactionCreate', async interaction => {
           embeds: [trigger.embed],
           ephemeral: false
         };
-        if (commandName === 'support') opts.components = [createSupportRow()];
+        if (commandName === 'support') {
+          opts.components = [createSupportRow()];
+        } else if (trigger?.url && trigger?.buttonLabel) {
+          opts.components = [createLinkRow(trigger.url, trigger.buttonLabel)];
+        }
         return interaction.reply(opts);
       }
 
