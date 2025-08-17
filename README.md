@@ -6,7 +6,7 @@
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![GitHub Stars](https://img.shields.io/github/stars/davevancauwenberghe/CityMart-Services)
 
-A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services <keyword>" and replies with rich embeds for commands like "community", "experience", "support", "lorebook", "keywords", "lamp", "ping", and "ask".
+A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services" and replies with rich embeds for commands like "community", "experience", "support", "lorebook", "keywords", "lamp", "ping", and "ask".
 
 ## 🚀 Getting Started
 

@@ -32,6 +32,14 @@ const commands = [
     .setDescription('Get the CityMart Shopping Experience link'),
 
   new SlashCommandBuilder()
+    .setName('application')
+    .setDescription('Open the CityMart Application Centre'),
+
+  new SlashCommandBuilder()
+    .setName('documentation')
+    .setDescription('Open the CityMart documentation'),
+
+  new SlashCommandBuilder()
     .setName('lorebook')
     .setDescription('Open the CityMart Lore Book'),
 
@@ -66,8 +74,13 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
       ),
       { body: commands }
     );
-    console.log(`[${new Date().toISOString()}] ✅ Successfully registered ${commands.length} slash commands.`);
+    console.log(
+      `[${new Date().toISOString()}] ✅ Successfully registered ${commands.length} slash commands.`
+    );
   } catch (err) {
-    console.error(`[${new Date().toISOString()}] ❌ Error registering slash commands:`, err);
+    console.error(
+      `[${new Date().toISOString()}] ❌ Error registering slash commands:`,
+      err
+    );
   }
 })();
