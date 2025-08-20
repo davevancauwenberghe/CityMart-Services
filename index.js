@@ -87,7 +87,7 @@ const CITYMART_EMOJI     = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_
 const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI_RAW    : '💡';
 
 // Reaction keywords
-const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
+const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp',"citymart","city","Dave","bot"];
 
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
