@@ -58,12 +58,19 @@ setInterval(() => {
   // (askHistory left as-is so context persists while bot runs)
 }, 30 * 60 * 1000);
 
-// ---------------------- Environment ----------------------
-const GUILD_ID   = process.env.GUILD_ID;
-const WORKER_URL = process.env.WORKER_URL; // hallAI Worker URL
+// ---------------------- Environment (via secrets) ----------------------
+const GUILD_ID            = process.env.GUILD_ID;
+const WORKER_URL          = process.env.WORKER_URL; // hallAI Worker URL
+const BOT_URL             = process.env.BOT_URL || 'https://citymart-bot.fly.dev/';
+const GENERAL_CHANNEL_ID  = process.env.GENERAL_CHANNEL_ID; // "I'm back" channel
+const SUPPORT_CHANNEL_ID  = process.env.SUPPORT_CHANNEL_ID; // support channel
+const ROBLOX_GROUP_ID     = process.env.ROBLOX_GROUP_ID;    // reserved for future use
+
 if (!process.env.DISCORD_TOKEN) console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
-if (!GUILD_ID)                   console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
-if (!WORKER_URL)                 console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
+if (!GUILD_ID)                  console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
+if (!WORKER_URL)                console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
+if (!GENERAL_CHANNEL_ID)        console.warn('⚠️ GENERAL_CHANNEL_ID is not set; "I\'m back" message will be skipped.');
+if (!SUPPORT_CHANNEL_ID)        console.warn('⚠️ SUPPORT_CHANNEL_ID is not set; support button will be invalid.');
 
 // ---------------------- Discord Client ----------------------
 const client = new Client({
@@ -75,10 +82,7 @@ const client = new Client({
 });
 
 // ---------------------- Constants ----------------------
-const SUPPORT_CHANNEL_ID = '1385699550005694586';
-const GENERAL_CHANNEL_ID = '1385065666637201462'; // for the "I'm back" message
-const BOT_URL            = 'https://citymart-bot.fly.dev/';
-const THUMBNAIL_URL      = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
+const THUMBNAIL_URL = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
 
 // Custom emojis
 const CITYMART_EMOJI_RAW = '<:citymart:1400628955253575711>';
@@ -87,34 +91,13 @@ const CITYMART_EMOJI     = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_
 const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI_RAW    : '💡';
 
 // Reaction keywords
-const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp',"citymart","city","Dave","bot"];
+const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
 
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
-// ---------------------- Helpers ----------------------
-function createSupportRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel('Go to Support')
-      .setEmoji('❓')
-      .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
-  );
-}
-
-// Generic link row for URL-based commands
-function createLinkRow(url, label) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel(label)
-      .setStyle(ButtonStyle.Link)
-      .setURL(url)
-  );
-}
-
 // ---------------------- Triggers ----------------------
-// Each trigger can optionally include `url` + `buttonLabel` to show a link button
+// Added `url` + `buttonLabel` for link buttons on community/experience/lorebook/application/documentation
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -148,7 +131,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Application Centre')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription('Take the 10-question quiz and become a CityMart Trainee!')
+      .setDescription('Apply to join the CityMart Group team via our Roblox Application Centre.')
       .setURL('https://www.roblox.com/games/138757153564625/CityMart-Application-Centre')
       .setTimestamp()
   },
@@ -170,7 +153,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Documentation')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription('Browse the official CityMart documentation on GitBook.')
+      .setDescription('Find guides, policies, and documentation for the CityMart Group.')
       .setURL('https://citymartgroup.gitbook.io/docs/')
       .setTimestamp()
   },
@@ -214,13 +197,37 @@ const HELP_EMBED = new EmbedBuilder()
   .setColor(0x00FFAA)
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
-    { name: '🔗 Roblox Links', value: 'community\nexperience\napplication',      inline: false },
-    { name: '🆘 Support',      value: 'support\ndocumentation',                  inline: false },
-    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',                inline: false },
-    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`,             inline: false }
+    { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
+    { name: '🆘 Support',      value: 'support\ndocumentation',            inline: false },
+    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',          inline: false },
+    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`,        inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
+
+// ---------------------- Helpers ----------------------
+function createSupportRow() {
+  const url = (GUILD_ID && SUPPORT_CHANNEL_ID)
+    ? `https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`
+    : 'https://discord.com/channels/@me'; // safe fallback
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('Go to Support')
+      .setEmoji('❓')
+      .setStyle(ButtonStyle.Link)
+      .setURL(url)
+  );
+}
+
+// Generic link row for URL-based commands
+function createLinkRow(url, label) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel(label)
+      .setStyle(ButtonStyle.Link)
+      .setURL(url)
+  );
+}
 
 // ---------------------- Lifecycle ----------------------
 client.once('ready', async () => {
@@ -243,6 +250,7 @@ client.once('ready', async () => {
   const randomMessage = comebackLines[Math.floor(Math.random() * comebackLines.length)];
 
   try {
+    if (!GENERAL_CHANNEL_ID) return;
     const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
     if (channel?.isTextBased()) {
       const embed = new EmbedBuilder()
@@ -354,8 +362,8 @@ client.on('interactionCreate', async interaction => {
       case 'community':
       case 'experience':
       case 'application':
-      case 'documentation':
       case 'support':
+      case 'documentation':
       case 'lorebook':
       case 'lamp': {
         const trigger = TRIGGERS.find(t => t.keyword === commandName);
