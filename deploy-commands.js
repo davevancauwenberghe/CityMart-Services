@@ -47,6 +47,10 @@ const commands = [
     .setName('lamp')
     .setDescription("Shh... the lamp doesn't exist"),
 
+  new SlashCommandBuilder()
+    .setName('members')
+    .setDescription('Show the current Roblox Community member count'),
+
   // hallAI bridge
   new SlashCommandBuilder()
     .setName('ask')
@@ -82,5 +86,6 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
       `[${new Date().toISOString()}] ❌ Error registering slash commands:`,
       err
     );
+    process.exit(1);
   }
 })();

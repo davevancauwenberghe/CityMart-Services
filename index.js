@@ -22,6 +22,10 @@ const ASK_WINDOW_MS = 60_000;
 const ASK_MAX       = 5;
 const askBuckets    = new Map(); // key -> [timestamps]
 
+// /members-specific: 1 req / 30s per user
+const MEMBERS_WINDOW_MS = 30_000;
+const membersBuckets = new Map(); // userId -> lastTimestamp
+
 // tiny in-memory history for /ask (per conversation)
 const MAX_TURNS   = 8; // 8 user+assistant pairs
 const askHistory  = new Map(); // key -> [{role, content}, ...]
@@ -44,6 +48,13 @@ function pushTurn(key, userText, assistantText) {
   const next = [...prev, { role: 'user', content: userText }, { role: 'assistant', content: assistantText }];
   askHistory.set(key, next.slice(-MAX_TURNS * 2));
 }
+function allowMembersCheck(userId) {
+  const last = membersBuckets.get(userId) || 0;
+  const now = Date.now();
+  if (now - last < MEMBERS_WINDOW_MS) return false;
+  membersBuckets.set(userId, now);
+  return true;
+}
 
 // Periodic cleanup of stale maps (memory hygiene)
 setInterval(() => {
@@ -55,22 +66,29 @@ setInterval(() => {
     if (pruned.length) askBuckets.set(key, pruned);
     else askBuckets.delete(key);
   }
-  // (askHistory left as-is so context persists while bot runs)
+  // membersBuckets: keep lightweight; no need to prune aggressively
 }, 30 * 60 * 1000);
 
-// ---------------------- Environment (via secrets) ----------------------
-const GUILD_ID            = process.env.GUILD_ID;
-const WORKER_URL          = process.env.WORKER_URL; // hallAI Worker URL
-const BOT_URL             = process.env.BOT_URL || 'https://citymart-bot.fly.dev/';
-const GENERAL_CHANNEL_ID  = process.env.GENERAL_CHANNEL_ID; // "I'm back" channel
-const SUPPORT_CHANNEL_ID  = process.env.SUPPORT_CHANNEL_ID; // support channel
-const ROBLOX_GROUP_ID     = process.env.ROBLOX_GROUP_ID;    // reserved for future use
+// ---------------------- Environment ----------------------
+const {
+  DISCORD_TOKEN,
+  GUILD_ID,
+  WORKER_URL,
+  SUPPORT_CHANNEL_ID,
+  GENERAL_CHANNEL_ID,
+  COMMANDS_CHANNEL_ID,
+  ROBLOX_GROUP_ID,
+  BOT_URL
+} = process.env;
 
-if (!process.env.DISCORD_TOKEN) console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
-if (!GUILD_ID)                  console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
-if (!WORKER_URL)                console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
-if (!GENERAL_CHANNEL_ID)        console.warn('⚠️ GENERAL_CHANNEL_ID is not set; "I\'m back" message will be skipped.');
-if (!SUPPORT_CHANNEL_ID)        console.warn('⚠️ SUPPORT_CHANNEL_ID is not set; support button will be invalid.');
+if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
+if (!GUILD_ID)            console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
+if (!WORKER_URL)          console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
+if (!SUPPORT_CHANNEL_ID)  console.warn('⚠️ SUPPORT_CHANNEL_ID is not set.');
+if (!GENERAL_CHANNEL_ID)  console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
+if (!COMMANDS_CHANNEL_ID) console.warn('⚠️ COMMANDS_CHANNEL_ID is not set (Roblox tracker + toasts).');
+if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /members).');
+if (!BOT_URL)             console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
 
 // ---------------------- Discord Client ----------------------
 const client = new Client({
@@ -91,7 +109,7 @@ const CITYMART_EMOJI     = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_
 const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI_RAW    : '💡';
 
 // Reaction keywords
-const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp'];
+const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp','citymart'];
 
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
@@ -131,7 +149,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Application Centre')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription('Apply to join the CityMart Group team via our Roblox Application Centre.')
+      .setDescription('Apply to work with the CityMart Group via our Application Centre on Roblox.')
       .setURL('https://www.roblox.com/games/138757153564625/CityMart-Application-Centre')
       .setTimestamp()
   },
@@ -153,7 +171,7 @@ const TRIGGERS = [
     embed: new EmbedBuilder()
       .setTitle('CityMart Documentation')
       .setThumbnail(THUMBNAIL_URL)
-      .setDescription('Find guides, policies, and documentation for the CityMart Group.')
+      .setDescription('Browse our official docs for guidelines, processes, and more.')
       .setURL('https://citymartgroup.gitbook.io/docs/')
       .setTimestamp()
   },
@@ -198,35 +216,89 @@ const HELP_EMBED = new EmbedBuilder()
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
     { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
-    { name: '🆘 Support',      value: 'support\ndocumentation',            inline: false },
-    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask',          inline: false },
-    { name: '🔗 Dashboard',    value: `[Bot Dashboard](${BOT_URL})`,        inline: false }
+    { name: '🆘 Support',      value: 'support\ndocumentation',             inline: false },
+    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask\nmembers', inline: false },
+    { name: '🔗 Dashboard',    value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
 
 // ---------------------- Helpers ----------------------
 function createSupportRow() {
-  const url = (GUILD_ID && SUPPORT_CHANNEL_ID)
-    ? `https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`
-    : 'https://discord.com/channels/@me'; // safe fallback
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setLabel('Go to Support')
       .setEmoji('❓')
       .setStyle(ButtonStyle.Link)
-      .setURL(url)
+      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
+  );
+}
+function createLinkRow(url, label) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url)
   );
 }
 
-// Generic link row for URL-based commands
-function createLinkRow(url, label) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel(label)
-      .setStyle(ButtonStyle.Link)
-      .setURL(url)
-  );
+// ---------------------- Roblox member count tracker ----------------------
+let lastMemberCount = null;
+const COMMUNITY_URL = 'https://www.roblox.com/communities/36060455/CityMart-Group#!/about';
+
+async function fetchRobloxMemberCount(groupId) {
+  // Public endpoint: https://groups.roblox.com/v1/groups/{groupId}
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10000); // 10s timeout
+  try {
+    const res = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) throw new Error(`Roblox API HTTP ${res.status}`);
+    const data = await res.json();
+    const count = Number(data?.memberCount);
+    if (!Number.isFinite(count)) throw new Error('memberCount not found');
+    return count;
+  } catch (e) {
+    clearTimeout(t);
+    throw e;
+  }
+}
+
+async function pollRobloxMembers() {
+  if (!ROBLOX_GROUP_ID || !COMMANDS_CHANNEL_ID) return;
+  try {
+    const current = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
+    if (lastMemberCount === null) {
+      lastMemberCount = current;
+      return; // no announcement on first sync
+    }
+    if (current !== lastMemberCount) {
+      const diff = current - lastMemberCount;
+      lastMemberCount = current;
+
+      const channel = await client.channels.fetch(COMMANDS_CHANNEL_ID).catch(() => null);
+      if (!channel || !channel.isTextBased()) return;
+
+      const growing = diff > 0;
+      const abs = Math.abs(diff);
+      const title = growing
+        ? `🎉 New ${abs === 1 ? 'member has' : `${abs} members have`} joined the Roblox Community!`
+        : `👋 ${abs === 1 ? 'A member has' : `${abs} members have`} left the Roblox Community.`;
+
+      const color = growing ? 0x38a34a : 0xd9534f;
+
+      const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(title)
+        .setDescription(`Current member count: **${current.toLocaleString()}**`)
+        .setURL(COMMUNITY_URL)
+        .setThumbnail(THUMBNAIL_URL)
+        .setTimestamp();
+
+      const row = createLinkRow(COMMUNITY_URL, 'Open Roblox Community');
+      await channel.send({ embeds: [embed], components: [row] });
+    }
+  } catch (err) {
+    // Silent-ish; log to console but do not spam Discord
+    console.error('Roblox tracker error:', err?.message || err);
+  }
 }
 
 // ---------------------- Lifecycle ----------------------
@@ -245,28 +317,37 @@ client.once('ready', async () => {
     "Downtime? Never heard of her. Let’s go!",
     "CityMart Services are a go! 🚀",
     "Apologies for the brief AFK, just didn't feel like it.",
-    "And we're back! Time to get shopping!"
+    "And we're back! Time to get shopping!",
+    "Oh, though the lamp caught me for a second there! But I've used /e dance and I'm back."
   ];
   const randomMessage = comebackLines[Math.floor(Math.random() * comebackLines.length)];
 
   try {
-    if (!GENERAL_CHANNEL_ID) return;
-    const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
-    if (channel?.isTextBased()) {
-      const embed = new EmbedBuilder()
-        .setColor('#38a34a')
-        .setTitle(randomMessage)
-        .setDescription('Your friendly CityMart Services bot is back online after an update or restart.')
-        .setThumbnail(THUMBNAIL_URL)
-        .setFooter({
-          text: `Uptime started: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/Brussels' })}`
-        })
-        .setTimestamp();
+    if (GENERAL_CHANNEL_ID) {
+      const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+      if (channel?.isTextBased()) {
+        const embed = new EmbedBuilder()
+          .setColor('#38a34a')
+          .setTitle(randomMessage)
+          .setDescription('Your friendly CityMart Services bot is back online after an update or restart.')
+          .setThumbnail(THUMBNAIL_URL)
+          .setFooter({
+            text: `Uptime started: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/Brussels' })}`
+          })
+          .setTimestamp();
 
-      await channel.send({ embeds: [embed] });
+        await channel.send({ embeds: [embed] });
+      }
     }
   } catch (err) {
     console.error('⚠️ Could not send comeback message:', err);
+  }
+
+  // Kick off Roblox tracker
+  if (ROBLOX_GROUP_ID && COMMANDS_CHANNEL_ID) {
+    // initial sync (no toast) + 15 min interval
+    pollRobloxMembers();
+    setInterval(pollRobloxMembers, 15 * 60 * 1000);
   }
 });
 
@@ -316,7 +397,30 @@ client.on('messageCreate', async message => {
       return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
     }
 
-    // Other triggers
+    // Members (mention-based keyword)
+    if (/\bmembers?\b/i.test(msg)) {
+      if (!allowMembersCheck(message.author.id)) {
+        return message.reply('⏳ Please wait a bit before checking member counts again.');
+      }
+      if (!ROBLOX_GROUP_ID) {
+        return message.reply('⚠️ ROBLOX_GROUP_ID not configured.');
+      }
+      try {
+        const count = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
+        const embed = new EmbedBuilder()
+          .setColor('#38a34a')
+          .setTitle('Roblox Community Members')
+          .setDescription(`Current member count: **${count.toLocaleString()}**`)
+          .setURL(COMMUNITY_URL)
+          .setThumbnail(THUMBNAIL_URL)
+          .setTimestamp();
+        return message.channel.send({ content: `${message.author}`, embeds: [embed], components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')] });
+      } catch (e) {
+        return message.reply('❌ Could not fetch the member count right now. Try again later.');
+      }
+    }
+
+    // Other trigger keywords
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
       if (trigger.regex.test(msg)) {
@@ -362,8 +466,8 @@ client.on('interactionCreate', async interaction => {
       case 'community':
       case 'experience':
       case 'application':
-      case 'support':
       case 'documentation':
+      case 'support':
       case 'lorebook':
       case 'lamp': {
         const trigger = TRIGGERS.find(t => t.keyword === commandName);
@@ -390,6 +494,30 @@ client.on('interactionCreate', async interaction => {
           .setFooter({ text: 'CityMart Services' })
           .setTimestamp();
         return interaction.reply({ embeds: [pingEmbed], ephemeral: false });
+      }
+
+      case 'members': {
+        if (!allowMembersCheck(user.id)) {
+          return interaction.reply({ content: '⏳ Please wait a bit before checking member counts again.', ephemeral: true });
+        }
+        if (!ROBLOX_GROUP_ID) {
+          return interaction.reply({ content: '⚠️ ROBLOX_GROUP_ID not configured.', ephemeral: true });
+        }
+        await interaction.deferReply();
+        try {
+          const count = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
+          const embed = new EmbedBuilder()
+            .setColor('#38a34a')
+            .setTitle('Roblox Community Members')
+            .setDescription(`Current member count: **${count.toLocaleString()}**`)
+            .setURL(COMMUNITY_URL)
+            .setThumbnail(THUMBNAIL_URL)
+            .setFooter({ text: 'CityMart Services' })
+            .setTimestamp();
+          return interaction.editReply({ embeds: [embed], components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')] });
+        } catch (e) {
+          return interaction.editReply('❌ Could not fetch the member count right now. Try again later.');
+        }
       }
 
       // hallAI bridge
@@ -449,7 +577,7 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(DISCORD_TOKEN);
 
 // ---------------------- Tiny landing page server ----------------------
 const PORT = process.env.PORT || 8080;
