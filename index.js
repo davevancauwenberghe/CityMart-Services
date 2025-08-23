@@ -26,6 +26,10 @@ const askBuckets    = new Map(); // key -> [timestamps]
 const MEMBERS_WINDOW_MS = 30_000;
 const membersBuckets = new Map(); // userId -> lastTimestamp
 
+// /memberlookup-specific: 1 req / 15s per user
+const LOOKUP_WINDOW_MS = 15_000;
+const lookupBuckets = new Map(); // userId -> lastTimestamp
+
 // tiny in-memory history for /ask (per conversation)
 const MAX_TURNS   = 8; // 8 user+assistant pairs
 const askHistory  = new Map(); // key -> [{role, content}, ...]
@@ -55,6 +59,13 @@ function allowMembersCheck(userId) {
   membersBuckets.set(userId, now);
   return true;
 }
+function allowMemberLookup(userId) {
+  const last = lookupBuckets.get(userId) || 0;
+  const now = Date.now();
+  if (now - last < LOOKUP_WINDOW_MS) return false;
+  lookupBuckets.set(userId, now);
+  return true;
+}
 
 // Periodic cleanup of stale maps (memory hygiene)
 setInterval(() => {
@@ -66,7 +77,7 @@ setInterval(() => {
     if (pruned.length) askBuckets.set(key, pruned);
     else askBuckets.delete(key);
   }
-  // membersBuckets: keep lightweight; no need to prune aggressively
+  // membersBuckets / lookupBuckets are tiny; pruning not critical
 }, 30 * 60 * 1000);
 
 // ---------------------- Environment ----------------------
@@ -87,7 +98,7 @@ if (!WORKER_URL)          console.warn('⚠️ WORKER_URL is not set; /ask will 
 if (!SUPPORT_CHANNEL_ID)  console.warn('⚠️ SUPPORT_CHANNEL_ID is not set.');
 if (!GENERAL_CHANNEL_ID)  console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
 if (!COMMANDS_CHANNEL_ID) console.warn('⚠️ COMMANDS_CHANNEL_ID is not set (Roblox tracker + toasts).');
-if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /members).');
+if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /members + memberlookup badge).');
 if (!BOT_URL)             console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
 
 // ---------------------- Discord Client ----------------------
@@ -114,8 +125,97 @@ const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp','citym
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
+// ---------------------- Roblox helpers (memberlookup) ----------------------
+const ROBLOX_HEADERS = {
+  'Content-Type': 'application/json',
+  'User-Agent': 'CityMart-ServicesBot/1.0 (+discord)'
+};
+
+function sanitizeUsername(raw) {
+  if (!raw) return '';
+  const s = String(raw).trim().replace(/^@+/, '');
+  // Roblox: letters, numbers, underscore; 3-20 chars
+  return s.match(/^[A-Za-z0-9_]{3,20}$/) ? s : '';
+}
+
+async function robloxUsernameToId(username) {
+  try {
+    const res = await fetch('https://users.roblox.com/v1/usernames/users', {
+      method: 'POST',
+      headers: ROBLOX_HEADERS,
+      body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+    });
+    if (!res.ok) {
+      console.error('username→id HTTP', res.status);
+      return null;
+    }
+    const data = await res.json();
+    const id = data?.data?.[0]?.id ?? null;
+    return id || null;
+  } catch (e) {
+    console.error('username→id error', e);
+    return null;
+  }
+}
+
+async function robloxUserInfo(userId) {
+  const res = await fetch(`https://users.roblox.com/v1/users/${userId}`, { headers: { 'User-Agent': ROBLOX_HEADERS['User-Agent'] }});
+  if (!res.ok) throw new Error(`Roblox user info failed (${res.status})`);
+  return res.json();
+}
+
+async function robloxAvatarThumb(userId) {
+  const url = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`;
+  const res = await fetch(url, { headers: { 'User-Agent': ROBLOX_HEADERS['User-Agent'] }});
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.data?.[0]?.imageUrl ?? null;
+}
+
+async function robloxIsInGroup(userId, groupId) {
+  if (!groupId) return false;
+  const res = await fetch(`https://groups.roblox.com/v1/users/${userId}/groups/roles`, { headers: { 'User-Agent': ROBLOX_HEADERS['User-Agent'] }});
+  if (!res.ok) {
+    console.error('groups/roles HTTP', res.status);
+    return false;
+  }
+  const data = await res.json();
+  return Array.isArray(data) && data.some(g => String(g.group?.id) === String(groupId));
+}
+
+function buildMemberLookupEmbed(info, avatarUrl, inGroup) {
+  const profileUrl = `https://www.roblox.com/users/${info.id}/profile`;
+  const joined = new Date(info.created);
+  const embed = new EmbedBuilder()
+    .setTitle(`Roblox: ${info.displayName ?? info.name}`)
+    .setURL(profileUrl)
+    .setThumbnail(avatarUrl || THUMBNAIL_URL)
+    .setColor(inGroup ? 0x38a34a : 0x00AEFF)
+    .addFields(
+      { name: 'Username', value: info.name, inline: true },
+      { name: 'User ID', value: String(info.id), inline: true },
+      { name: 'Joined', value: joined.toLocaleString('en-GB', { timeZone: 'Europe/Brussels' }), inline: false }
+    )
+    .setFooter({ text: inGroup ? '✅ Member of CityMart Group' : 'Not in CityMart Group' })
+    .setTimestamp();
+
+  const desc = (info.description || '').trim();
+  if (desc) {
+    embed.addFields({ name: 'Bio', value: desc.length > 1024 ? desc.slice(0, 1015) + '…' : desc });
+  }
+
+  const components = [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Open Profile')
+        .setStyle(ButtonStyle.Link)
+        .setURL(profileUrl)
+    )
+  ];
+  return { embed, components };
+}
+
 // ---------------------- Triggers ----------------------
-// Added `url` + `buttonLabel` for link buttons on community/experience/lorebook/application/documentation
 const TRIGGERS = [
   {
     keyword: 'community',
@@ -217,7 +317,7 @@ const HELP_EMBED = new EmbedBuilder()
   .addFields(
     { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
     { name: '🆘 Support',      value: 'support\ndocumentation',             inline: false },
-    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask\nmembers', inline: false },
+    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask\nmembers\nmemberlookup <username>', inline: false },
     { name: '🔗 Dashboard',    value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
@@ -244,11 +344,13 @@ let lastMemberCount = null;
 const COMMUNITY_URL = 'https://www.roblox.com/communities/36060455/CityMart-Group#!/about';
 
 async function fetchRobloxMemberCount(groupId) {
-  // Public endpoint: https://groups.roblox.com/v1/groups/{groupId}
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 10000); // 10s timeout
   try {
-    const res = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`, { signal: ctrl.signal });
+    const res = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': ROBLOX_HEADERS['User-Agent'] }
+    });
     clearTimeout(t);
     if (!res.ok) throw new Error(`Roblox API HTTP ${res.status}`);
     const data = await res.json();
@@ -296,7 +398,6 @@ async function pollRobloxMembers() {
       await channel.send({ embeds: [embed], components: [row] });
     }
   } catch (err) {
-    // Silent-ish; log to console but do not spam Discord
     console.error('Roblox tracker error:', err?.message || err);
   }
 }
@@ -345,8 +446,7 @@ client.once('ready', async () => {
 
   // Kick off Roblox tracker
   if (ROBLOX_GROUP_ID && COMMANDS_CHANNEL_ID) {
-    // initial sync (no toast) + 15 min interval
-    pollRobloxMembers();
+    pollRobloxMembers(); // initial sync (no toast)
     setInterval(pollRobloxMembers, 15 * 60 * 1000);
   }
 });
@@ -379,6 +479,37 @@ client.on('messageCreate', async message => {
         content: `${message.author}`,
         embeds: [LAMP_TRIGGER.embed]
       });
+    }
+
+    // ---- memberlookup as mention-keyword: "@bot memberlookup SomeUser" ----
+    if (message.mentions.has(client.user)) {
+      const mlMatch = message.content.match(/\bmemberlookup\s+([A-Za-z0-9_@]{3,25})/i);
+      if (mlMatch) {
+        if (!allowMemberLookup(message.author.id)) {
+          return message.reply('⏳ Please wait a few seconds before using member lookup again.');
+        }
+        const raw = mlMatch[1];
+        const username = sanitizeUsername(raw);
+        if (!username) {
+          return message.reply('⚠️ Please provide a valid Roblox username (3–20 letters/numbers/underscore).');
+        }
+        try {
+          const userId = await robloxUsernameToId(username);
+          if (!userId) {
+            return message.reply(`Couldn't find a Roblox user named **${username}**.`);
+          }
+          const [info, avatarUrl, inGroup] = await Promise.all([
+            robloxUserInfo(userId),
+            robloxAvatarThumb(userId),
+            robloxIsInGroup(userId, ROBLOX_GROUP_ID)
+          ]);
+          const { embed, components } = buildMemberLookupEmbed(info, avatarUrl, inGroup);
+          return message.channel.send({ content: `${message.author}`, embeds: [embed], components });
+        } catch (e) {
+          console.error('memberlookup error:', e);
+          return message.reply('⚠️ Something went wrong fetching that user.');
+        }
+      }
     }
 
     // Other keywords require mention
@@ -414,7 +545,11 @@ client.on('messageCreate', async message => {
           .setURL(COMMUNITY_URL)
           .setThumbnail(THUMBNAIL_URL)
           .setTimestamp();
-        return message.channel.send({ content: `${message.author}`, embeds: [embed], components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')] });
+        return message.channel.send({
+          content: `${message.author}`,
+          embeds: [embed],
+          components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')]
+        });
       } catch (e) {
         return message.reply('❌ Could not fetch the member count right now. Try again later.');
       }
@@ -514,7 +649,10 @@ client.on('interactionCreate', async interaction => {
             .setThumbnail(THUMBNAIL_URL)
             .setFooter({ text: 'CityMart Services' })
             .setTimestamp();
-          return interaction.editReply({ embeds: [embed], components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')] });
+          return interaction.editReply({
+            embeds: [embed],
+            components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')]
+          });
         } catch (e) {
           return interaction.editReply('❌ Could not fetch the member count right now. Try again later.');
         }
@@ -523,8 +661,6 @@ client.on('interactionCreate', async interaction => {
       // hallAI bridge
       case 'ask': {
         const prompt = interaction.options.getString('prompt', true);
-
-        // /ask burst limit per conversation
         const key = askKey(guildId, channelId, user.id);
         if (!allowAsk(key)) {
           return interaction.reply({
@@ -532,10 +668,8 @@ client.on('interactionCreate', async interaction => {
             ephemeral: true
           });
         }
+        await interaction.deferReply();
 
-        await interaction.deferReply(); // show "thinking…"
-
-        // Build conversation context
         const history = getHistory(key);
         const messages = [
           { role: 'system', content: "You are hallAI, a retro terminal AI assistant built by Dave Van Cauwenberghe and launched on Thursday, 7 August 2025. Be helpful, nerdy, concise with a touch of sensitivity and witty humor. Use markdown where useful. You're running on gpt-4.1-nano" },
@@ -547,25 +681,46 @@ client.on('interactionCreate', async interaction => {
           const res = await fetch(WORKER_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt,           // for backward compatibility
-              identifier: key,  // worker can use this if desired
-              messages          // optional; worker can ignore
-            })
+            body: JSON.stringify({ prompt, identifier: key, messages })
           });
-
           if (!res.ok) throw new Error(`Worker returned ${res.status}`);
           const text = await res.text();
-
-          // Save this turn locally
           pushTurn(key, prompt, text);
-
-          // Discord 2k char safety
           const reply = text.length > 2000 ? text.slice(0, 1990) + '…' : text;
           return interaction.editReply(reply);
         } catch (err) {
           console.error('ask → hallAI error:', err);
           return interaction.editReply('❌ Sorry, I couldn’t reach hallAI. Try again later.');
+        }
+      }
+
+      // -------- /memberlookup --------
+      case 'memberlookup': {
+        if (!allowMemberLookup(user.id)) {
+          return interaction.reply({ content: '⏳ Please wait a few seconds before using member lookup again.', ephemeral: true });
+        }
+        const raw = interaction.options.getString('username', true);
+        const username = sanitizeUsername(raw);
+        if (!username) {
+          return interaction.reply({ content: '⚠️ Please provide a valid Roblox username (3–20 letters/numbers/underscore).', ephemeral: true });
+        }
+
+        await interaction.deferReply();
+        try {
+          const userId = await robloxUsernameToId(username);
+          if (!userId) {
+            return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
+          }
+          const [info, avatarUrl, inGroup] = await Promise.all([
+            robloxUserInfo(userId),
+            robloxAvatarThumb(userId),
+            robloxIsInGroup(userId, ROBLOX_GROUP_ID)
+          ]);
+          const { embed, components } = buildMemberLookupEmbed(info, avatarUrl, inGroup);
+          return interaction.editReply({ embeds: [embed], components });
+        } catch (e) {
+          console.error('memberlookup error:', e);
+          return interaction.editReply('⚠️ Something went wrong fetching that user.');
         }
       }
     }
