@@ -71,7 +71,12 @@ const commands = [
         .setDescription('Roblox username to look up')
         .setRequired(true)
         .setMaxLength(20)
-    ))
+    )),
+
+  // Current Roblox community member count
+  noDM(new SlashCommandBuilder()
+    .setName('communitycount')
+    .setDescription('Show current Roblox Community member count'))
 ].map(c => c.toJSON());
 
 // Set up REST client
