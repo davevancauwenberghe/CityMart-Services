@@ -2,7 +2,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const spinner  = document.getElementById('spinner');
   const logo     = document.getElementById('logo');
   const content  = document.getElementById('content');
-  const tsEl     = document.getElementById('timestamp');
+  const tsTextEl = document.getElementById('timestamp-text'); // updated target
 
   // Particles
   if (window.particlesJS) {
@@ -30,7 +30,7 @@ window.addEventListener('DOMContentLoaded', () => {
       hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false
     });
-    tsEl.textContent = `Bot time — ${brussels}`;
+    tsTextEl.textContent = `Bot time — ${brussels}`;
   }
   updateTimestamp();
   setInterval(updateTimestamp, 1000);

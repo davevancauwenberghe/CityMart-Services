@@ -20,38 +20,57 @@
       <div id="content">
         <div class="title-group">
           <h1>CityMart Services Bot</h1>
-          <span class="version">v1.0.9.3</span>
+          <span class="version">v1.1</span>
         </div>
         <p>Your friendly Discord helper for the CityMart Group.</p>
         <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
 
-        <div class="status">
+        <div class="status" aria-label="Bot status: Online">
           <span class="status-dot"></span>
           <span>Online</span>
         </div>
 
-        <a class="discord-invite" href="https://discord.gg/vbCjaVjBeQ" target="_blank" rel="noopener noreferrer">Join Discord</a>
+        <a class="discord-invite" href="https://discord.gg/vbCjaVjBeQ" target="_blank" rel="noopener noreferrer" aria-label="Join our Discord server">
+          Join Discord
+        </a>
 
         <!-- Primary actions -->
         <div id="github-buttons">
-          <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services" data-icon="octicon-star" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer">Star</a>
-          <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services/issues" data-icon="octicon-issue-opened" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer">Issue</a>
+          <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services" data-icon="octicon-star" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer" aria-label="Star the CityMart Services repository on GitHub">Star</a>
+          <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services/issues" data-icon="octicon-issue-opened" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer" aria-label="View and create issues for CityMart Services on GitHub">Issue</a>
         </div>
 
         <!-- Timestamp -->
-        <div id="timestamp"></div>
-
-        <!-- Legal buttons (responsive row) -->
-        <div class="btn-row legal-row">
-          <a class="btn" href="privacy.html">Privacy Policy</a>
-          <a class="btn" href="tos.html">Terms of Service</a>
+        <div id="timestamp">
+          <span aria-hidden="true">🕒</span>
+          <span id="timestamp-text"></span>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Footer with legal links -->
+  <footer class="footer">
+    <div class="legal-row">
+      <a class="btn" href="privacy.html">Privacy Policy</a>
+      <a class="btn" href="tos.html">Terms of Service</a>
+    </div>
+  </footer>
+
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
   <script async defer src="https://buttons.github.io/buttons.js"></script>
   <script src="main.js"></script>
+  <script>
+    // Trigger animations on load
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('logo').classList.add('animate-logo');
+      document.getElementById('content').classList.add('animate-content');
+
+      // Set timestamp
+      const ts = document.getElementById('timestamp-text');
+      const now = new Date();
+      ts.textContent = now.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    });
+  </script>
 </body>
 </html>

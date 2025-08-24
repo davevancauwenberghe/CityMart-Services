@@ -124,9 +124,9 @@ code {
   border-radius: 999px;
   font-size: .8rem;
   color: var(--text-secondary);
-  transition: background-color .2s ease;
+  transition: background-color .2s ease, transform .2s ease;
 }
-.version:hover { background: rgba(56, 163, 74, 0.2); }
+.version:hover { background: rgba(56, 163, 74, 0.2); transform: scale(1.05); }
 
 /* Status */
 .status {
@@ -155,15 +155,9 @@ code {
 }
 @media (min-width: 420px) {
   #github-buttons {
-    grid-template-columns: auto auto 1fr;
+    grid-template-columns: auto auto;
     align-items: center;
   }
-}
-#github-buttons {
-  margin-top: 1.25rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr; 
-  gap: .6rem;
 }
 
 .github-button {
@@ -173,16 +167,22 @@ code {
   width: 100%;          
 }
 
+/* Discord invite button enhancement */
 .discord-invite {
   background: var(--discord-blue); color: #fff;
   padding: .55em .9em; border-radius: 10px; font-weight: 600;
   text-decoration: none; display: block; align-items: center; gap: 6px;
   font-size: .92rem; white-space: nowrap; border: none;
-   margin: 0.8rem auto 0;   
+  margin: 0.8rem auto 0;   
   width: fit-content;      
   text-align: center; 
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
-.discord-invite:hover { filter: brightness(1.06); }
+.discord-invite:hover {
+  filter: brightness(1.06);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 12px rgba(88,101,242,0.4);
+}
 
 /* Timestamp */
 #timestamp {
@@ -192,7 +192,9 @@ code {
   padding: .5rem;
   border-radius: 12px;
   background: rgba(255,255,255,0.06);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 /* Reusable button + legal row */
@@ -231,4 +233,31 @@ code {
 @media (max-width: 360px) {
   #container { padding: 16px; }
   .discord-invite { width: 100%; justify-content: center; }
+}
+
+/* Footer (for legal links moved to footer in index.html) */
+.footer {
+  margin-top: 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.footer .legal-row {
+  display: flex;
+  justify-content: center;
+  gap: .6rem;
+  margin-top: .5rem;
+}
+@media (max-width: 420px) {
+  .footer .legal-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }
