@@ -178,23 +178,6 @@ async function robloxAvatarThumb(userId) {
   return imageUrl;
 }
 
-// Keep this for possible future use (no footer anymore). Returns true/false/null(unknown).
-async function robloxIsInGroup(userId, groupId) {
-  if (!groupId) return null;
-  const key = `ingroup:${userId}:${groupId}`;
-  const cached = cacheGet(key);
-  if (cached !== null) return cached;
-
-  const res = await fetch(`https://groups.roblox.com/v1/users/${userId}/groups/roles`, {
-    headers: { 'User-Agent': OUTBOUND_UA }
-  });
-  if (!res.ok) { cacheSet(key, null, 2 * 60 * 1000); return null; }
-  const data = await res.json();
-  const inGroup = Array.isArray(data) && data.some(g => String(g.group?.id) === String(groupId));
-  cacheSet(key, inGroup, 2 * 60 * 1000);
-  return inGroup;
-}
-
 // No footer about group membership anymore
 function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
   const profileUrl = `https://www.roblox.com/users/${info.id}/profile`;
