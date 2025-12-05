@@ -369,7 +369,7 @@ if (!channel?.isTextBased()) return;
   const growing = diff > 0;
   const abs = Math.abs(diff);
   const title = growing
-    ? `🎉 ${abs} new shopper${abs===1?'':'s'} joined!`
+    ? `\u{1F389} ${abs} new shopper${abs===1?'':'s'} joined!`
     : `👋 ${abs} shopper${abs===1?'':'s'} left!`;
 
   const color = growing ? 0x38a34a : 0xd9534f;
