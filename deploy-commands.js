@@ -61,10 +61,10 @@ const commands = [
         .setMaxLength(1000)
     )),
 
-  // Roblox user lookup
+  // Roblox user lookup (with CityMart role)
   noDM(new SlashCommandBuilder()
     .setName('memberlookup')
-    .setDescription('Look up a Roblox user by username')
+    .setDescription('Look up a Roblox user and show their CityMart Group role')
     .addStringOption(opt =>
       opt
         .setName('username')
@@ -76,7 +76,7 @@ const commands = [
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
     .setName('communitycount')
-    .setDescription('Show current Roblox Community member count'))
+    .setDescription('Show the current CityMart Roblox Community member count'))
 ].map(c => c.toJSON());
 
 // Set up REST client
