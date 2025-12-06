@@ -897,6 +897,133 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
+        case 'giveaway': {
+        if (!interaction.guild) {
+          return interaction.reply({
+            content: 'This command can only be used inside a server.',
+            ephemeral: true
+          });
+        }
+
+        // Owner-only control
+        if (interaction.guild.ownerId !== user.id) {
+          return interaction.reply({
+            content: 'Only the server owner can manage giveaways.',
+            ephemeral: true
+          });
+        }
+
+        const sub = interaction.options.getSubcommand();
+
+        if (sub === 'start') {
+          const prize = interaction.options.getString('prize', true);
+          const endInput = interaction.options.getString('end', true);
+
+          const endAt = parseGiveawayEnd(endInput);
+          if (!endAt || endAt <= Date.now()) {
+            return interaction.reply({
+              content: 'Invalid end time. Use format `YYYY-MM-DD HH:mm` and make sure it is in the future.',
+              ephemeral: true
+            });
+          }
+
+          const endTs = Math.floor(endAt / 1000); // Unix seconds
+
+          const embed = new EmbedBuilder()
+            .setTitle('🎁 CityMart Giveaway')
+            .setColor(0xffc107)
+            .setThumbnail(THUMBNAIL_URL)
+            .setDescription(
+              [
+                `Prize: **${prize}**`,
+                '',
+                'Click the button below to enter!',
+                '',
+                `Ends: <t:${endTs}:F> (<t:${endTs}:R>)`
+              ].join('\n')
+            )
+            .setFooter({ text: `Hosted by ${interaction.user.tag}` })
+            .setTimestamp();
+
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('giveaway_enter')
+              .setLabel('Enter Giveaway')
+              .setStyle(ButtonStyle.Success)
+          );
+
+          const msg = await interaction.reply({
+            embeds: [embed],
+            components: [row],
+            fetchReply: true
+          });
+
+          giveaways.set(msg.id, {
+            messageId: msg.id,
+            channelId: msg.channel.id,
+            guildId: msg.guildId,
+            prize,
+            endAt,
+            createdBy: interaction.user.id,
+            entrants: [],
+            ended: false,
+            winnerId: null
+          });
+          saveGiveawaysToDisk();
+          break;
+        }
+
+        if (sub === 'end') {
+          const messageId = interaction.options.getString('message_id', true);
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: 'Could not find that giveaway. Make sure the message ID is correct.',
+              ephemeral: true
+            });
+          }
+          if (g.ended) {
+            return interaction.reply({
+              content: 'That giveaway has already ended.',
+              ephemeral: true
+            });
+          }
+          await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
+          await endGiveaway(messageId, g, { reroll: false });
+          g.ended = true;
+          break;
+        }
+
+        if (sub === 'reroll') {
+          const messageId = interaction.options.getString('message_id', true);
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: 'Could not find that giveaway. Make sure the message ID is correct.',
+              ephemeral: true
+            });
+          }
+          if (!g.ended) {
+            return interaction.reply({
+              content: 'You can only reroll a giveaway that has already ended.',
+              ephemeral: true
+            });
+          }
+          if (!g.entrants || g.entrants.length === 0) {
+            return interaction.reply({
+              content: 'There are no entrants to reroll from.',
+              ephemeral: true
+            });
+          }
+
+          await interaction.reply({ content: 'Rerolling giveaway winner...', ephemeral: true });
+          await endGiveaway(messageId, g, { reroll: true });
+          break;
+        }
+
+        break;
+      }
+
       // hallAI bridge
       case 'ask': {
         const prompt = interaction.options.getString('prompt', true);
@@ -974,6 +1101,18 @@ client.on('interactionCreate', async interaction => {
     if (interaction && !interaction.replied) {
       interaction.reply({ content: '⚠️ An internal error occurred.', ephemeral: true }).catch(() => {});
     }
+  }
+});
+
+// ---------------------- Button Interactions (Giveaways) ----------------------
+client.on('interactionCreate', async interaction => {
+  try {
+    if (!interaction.isButton()) return;
+    if (interaction.customId === 'giveaway_enter') {
+      await handleGiveawayEnterButton(interaction);
+    }
+  } catch (err) {
+    console.error('Button interaction error:', err);
   }
 });
 
