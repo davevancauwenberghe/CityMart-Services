@@ -109,6 +109,29 @@ async function handleGiveawayEnterButton(interaction) {
     return interaction.reply({ content: 'This giveaway is no longer active.', ephemeral: true });
   }
 
+  // 🔒 Rank-based entry requirement
+  if (GIVEAWAY_MIN_ROLE_ID) {
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+    const hasRole = member && member.roles.cache.has(GIVEAWAY_MIN_ROLE_ID);
+
+    if (!hasRole) {
+      const robloxLinkButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setLabel('Join Roblox Community')
+          .setStyle(ButtonStyle.Link)
+          .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
+      );
+
+      return interaction.reply({
+        content:
+          '❌ You must be a **CityMart Customer** to enter this giveaway.\n' +
+          'Join our Roblox Community and verify through Bloxlink to get that role! 🛒',
+        components: [robloxLinkButton],
+        ephemeral: true
+      });
+    }
+  }
+
   if (giveaway.ended || Date.now() >= giveaway.endAt) {
     return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
   }
@@ -268,7 +291,8 @@ const {
   COMMANDS_CHANNEL_ID,
   ROBLOX_GROUP_ID,
   BOT_URL,
-  USER_AGENT // optional override for outbound HTTP requests
+  USER_AGENT, // optional override for outbound HTTP requests
+  GIVEAWAY_MIN_ROLE_ID // 👈 REQUIRED for giveaway eligibility filtering
 } = process.env;
 
 if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
@@ -279,9 +303,11 @@ if (!GENERAL_CHANNEL_ID)  console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
 if (!COMMANDS_CHANNEL_ID) console.warn('⚠️ COMMANDS_CHANNEL_ID is not set (Roblox tracker + toasts).');
 if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /communitycount + memberlookup badge).');
 if (!BOT_URL)             console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
+if (!GIVEAWAY_MIN_ROLE_ID)
+  console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
 
 // Polite identification for outbound requests
-const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.0 (+https://citymart-bot.fly.dev)';
+const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
 
 // ---------------------- Discord Client ----------------------
 const client = new Client({
