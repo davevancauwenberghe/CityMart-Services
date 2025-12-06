@@ -109,31 +109,42 @@ async function handleGiveawayEnterButton(interaction) {
     return interaction.reply({ content: 'This giveaway is no longer active.', ephemeral: true });
   }
 
-  // 🔒 Rank-based entry requirement
-  if (GIVEAWAY_MIN_ROLE_ID) {
-    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-    const hasRole = member && member.roles.cache.has(GIVEAWAY_MIN_ROLE_ID);
-
-    if (!hasRole) {
-      const robloxLinkButton = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel('Join Roblox Community')
-          .setStyle(ButtonStyle.Link)
-          .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
-      );
-
-      return interaction.reply({
-        content:
-          '❌ You must be a **CityMart Customer** to enter this giveaway.\n' +
-          'Join our Roblox Community and verify through Bloxlink to get that role! 🛒',
-        components: [robloxLinkButton],
-        ephemeral: true
-      });
-    }
-  }
-
   if (giveaway.ended || Date.now() >= giveaway.endAt) {
     return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
+  }
+
+  // 🔒 Rank-based entry requirement: CityMart Customer or higher
+  if (GIVEAWAY_MIN_ROLE_ID && interaction.guild) {
+    const guild = interaction.guild;
+    const minRole = guild.roles.cache.get(GIVEAWAY_MIN_ROLE_ID);
+
+    if (!minRole) {
+      console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID is set but role was not found in this guild.');
+      // If the role is missing, we silently skip the restriction instead of blocking everyone
+    } else {
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+
+      const hasRequiredRank =
+        member &&
+        member.roles.cache.some(role => role.position >= minRole.position);
+
+      if (!hasRequiredRank) {
+        const robloxLinkButton = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('Join Roblox Community')
+            .setStyle(ButtonStyle.Link)
+            .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
+        );
+
+        return interaction.reply({
+          content:
+            '❌ You need to be a **CityMart Customer or higher** to enter this giveaway.\n' +
+            'Join our Roblox Community and verify via Bloxlink to get the required role. 🛒',
+          components: [robloxLinkButton],
+          ephemeral: true
+        });
+      }
+    }
   }
 
   if (!giveaway.entrants.includes(interaction.user.id)) {
