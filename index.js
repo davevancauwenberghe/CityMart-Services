@@ -657,10 +657,11 @@ client.once('ready', async () => {
     "Beep boop, system reboot complete. I'm back online!",
     "Well, that was a nice nap. Ready to serve again! 🛒",
     "Guess who just reconnected? Hint: it’s me.",
-    "Downtime? Never heard of her. Let’s go!",
+    "Downtime? Never heard of it. Let’s go!",
     "CityMart Services are a go! 🚀",
     "Apologies for the brief AFK, just didn't feel like it.",
     "And we're back! Time to get shopping!",
+    "Went to CityBean, but couldn't miss out any longer. Ping me whenever!",
     "Oh, thought the lamp caught me for a second there! But I've used /e dance and I'm back."
   ];
   const randomMessage = comebackLines[Math.floor(Math.random() * comebackLines.length)];
