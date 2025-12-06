@@ -7,11 +7,201 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActivityType
+  ActivityType,
+  PermissionFlagsBits
 } = require('discord.js');
 const http = require('http');
 const fs   = require('fs');
 const path = require('path');
+
+// ---------------------- CityMart Giveaways ----------------------
+const GIVEAWAYS_FILE = path.join(__dirname, 'data', 'giveaways.json');
+
+// Map<messageId, Giveaway>
+/*
+  Giveaway = {
+    messageId: string,
+    channelId: string,
+    guildId: string,
+    prize: string,
+    endAt: number,          // timestamp (ms)
+    createdBy: string,      // userId
+    entrants: string[],     // userIds
+    ended: boolean,
+    winnerId: string | null
+  }
+*/
+const giveaways = new Map();
+
+function loadGiveawaysFromDisk() {
+  try {
+    if (!fs.existsSync(GIVEAWAYS_FILE)) return;
+    const raw = fs.readFileSync(GIVEAWAYS_FILE, 'utf8');
+    const obj = JSON.parse(raw);
+    for (const [messageId, g] of Object.entries(obj)) {
+      giveaways.set(messageId, {
+        messageId,
+        channelId: g.channelId,
+        guildId: g.guildId,
+        prize: g.prize,
+        endAt: Number(g.endAt) || 0,
+        createdBy: g.createdBy,
+        entrants: Array.isArray(g.entrants) ? g.entrants : [],
+        ended: Boolean(g.ended),
+        winnerId: g.winnerId || null
+      });
+    }
+    console.log(`✅ Loaded ${giveaways.size} giveaways from disk`);
+  } catch (err) {
+    console.error('⚠️ Failed to load giveaways:', err);
+  }
+}
+
+function saveGiveawaysToDisk() {
+  try {
+    const obj = {};
+    for (const [messageId, g] of giveaways.entries()) {
+      obj[messageId] = {
+        channelId: g.channelId,
+        guildId: g.guildId,
+        prize: g.prize,
+        endAt: g.endAt,
+        createdBy: g.createdBy,
+        entrants: g.entrants,
+        ended: g.ended,
+        winnerId: g.winnerId
+      };
+    }
+    fs.mkdirSync(path.dirname(GIVEAWAYS_FILE), { recursive: true });
+    fs.writeFileSync(GIVEAWAYS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+  } catch (err) {
+    console.error('⚠️ Failed to save giveaways:', err);
+  }
+}
+
+// Parse "YYYY-MM-DD HH:mm" -> timestamp (ms)
+function parseGiveawayEnd(input) {
+  if (!input) return null;
+  const trimmed = input.trim();
+  const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/);
+  if (!m) return null;
+
+  const year   = Number(m[1]);
+  const month  = Number(m[2]) - 1; // 0-based
+  const day    = Number(m[3]);
+  const hour   = Number(m[4]);
+  const minute = Number(m[5]);
+
+  const date = new Date(year, month, day, hour, minute, 0, 0);
+  const ms = date.getTime();
+  if (!Number.isFinite(ms)) return null;
+  return ms;
+}
+
+// Button entry handler
+async function handleGiveawayEnterButton(interaction) {
+  const msg = interaction.message;
+  if (!msg || !msg.id) {
+    return interaction.reply({ content: 'This giveaway is no longer valid.', ephemeral: true });
+  }
+
+  const giveaway = giveaways.get(msg.id);
+  if (!giveaway) {
+    return interaction.reply({ content: 'This giveaway is no longer active.', ephemeral: true });
+  }
+
+  if (giveaway.ended || Date.now() >= giveaway.endAt) {
+    return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
+  }
+
+  if (!giveaway.entrants.includes(interaction.user.id)) {
+    giveaway.entrants.push(interaction.user.id);
+    saveGiveawaysToDisk();
+    return interaction.reply({ content: '🎉 You are now entered in this giveaway!', ephemeral: true });
+  } else {
+    return interaction.reply({ content: 'You are already entered in this giveaway.', ephemeral: true });
+  }
+}
+
+async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
+  // If first time ending, choose winner
+  if (!giveaway.ended && !reroll) {
+    giveaway.ended = true;
+  }
+
+  if (giveaway.entrants.length === 0) {
+    giveaway.winnerId = null;
+  } else {
+    // If reroll, pick a new winner (can be same, we keep it simple)
+    const idx = Math.floor(Math.random() * giveaway.entrants.length);
+    giveaway.winnerId = giveaway.entrants[idx];
+  }
+
+  try {
+    const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
+    if (channel && channel.isTextBased()) {
+      const msg = await channel.messages.fetch(messageId).catch(() => null);
+      if (msg) {
+        const baseEmbed = msg.embeds?.[0];
+        const embed = new EmbedBuilder(baseEmbed ?? {})
+          .setColor(0x00ff88)
+          .setTitle(reroll ? '🎁 CityMart Giveaway — Rerolled' : '🎁 CityMart Giveaway — Ended');
+
+        const lines = [
+          `Prize: **${giveaway.prize}**`,
+          giveaway.entrants.length
+            ? `Entries: **${giveaway.entrants.length}**`
+            : 'Entries: **0**'
+        ];
+
+        if (giveaway.winnerId) {
+          lines.push(`Winner: <@${giveaway.winnerId}> 🎉`);
+        } else {
+          lines.push('No winner could be chosen (no valid entries).');
+        }
+
+        embed.setDescription(lines.join('\n'));
+
+        await msg.edit({
+          embeds: [embed],
+          components: [] // remove the enter button
+        });
+
+        if (giveaway.winnerId) {
+          await channel.send(
+            reroll
+              ? `🎲 New winner for **${giveaway.prize}**: <@${giveaway.winnerId}>!`
+              : `🎉 Congratulations <@${giveaway.winnerId}>! You won **${giveaway.prize}**!`
+          );
+        } else if (!reroll) {
+          await channel.send('No winner could be chosen for this giveaway.');
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error ending/rerolling giveaway message:', err);
+  }
+
+  giveaways.set(messageId, giveaway);
+  saveGiveawaysToDisk();
+}
+
+async function checkGiveaways() {
+  const now = Date.now();
+  for (const [messageId, g] of giveaways.entries()) {
+    if (g.ended) continue;
+    if (now >= g.endAt) {
+      await endGiveaway(messageId, g, { reroll: false });
+      g.ended = true;
+    }
+  }
+}
+
+// Load on startup and schedule periodic checks (120s)
+loadGiveawaysFromDisk();
+setInterval(() => {
+  checkGiveaways().catch(err => console.error('checkGiveaways error:', err));
+}, 120_000);
 
 // ---------------------- Cooldowns & Rate Limits ----------------------
 const userCooldowns = new Map();
