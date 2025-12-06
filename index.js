@@ -572,6 +572,20 @@ function createLinkRow(url, label) {
 let lastMemberCount = null;
 const COMMUNITY_URL = 'https://www.roblox.com/communities/36060455/CityMart-Group#!/about';
 
+function updatePresence() {
+  if (!client.user) return;
+
+  const label =
+    (lastMemberCount !== null && Number.isFinite(lastMemberCount))
+      ? `${lastMemberCount.toLocaleString()} Shoppers`
+      : 'CityMart Shoppers 🛒';
+
+  client.user.setPresence({
+    activities: [{ name: label, type: ActivityType.Watching }],
+    status: 'online'
+  });
+}
+
 async function fetchRobloxMemberCount(groupId) {
   // Public endpoint: https://groups.roblox.com/v1/groups/{groupId}
   const ctrl = new AbortController();
@@ -597,13 +611,20 @@ async function pollRobloxMembers() {
   if (!ROBLOX_GROUP_ID || !COMMANDS_CHANNEL_ID) return;
   try {
     const current = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
+
     if (lastMemberCount === null) {
+      // first sync: set count, update presence, no announcement
       lastMemberCount = current;
-      return; // no announcement on first sync
+      updatePresence();
+      return;
     }
+
     if (current !== lastMemberCount) {
       const diff = current - lastMemberCount;
       lastMemberCount = current;
+
+      // update presence whenever the count changes
+      updatePresence();
 
       const channel = await client.channels.fetch(COMMANDS_CHANNEL_ID).catch(() => null);
       if (!channel || !channel.isTextBased()) return;
@@ -636,20 +657,13 @@ async function pollRobloxMembers() {
 // ---------------------- Lifecycle ----------------------
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
-  client.user.setPresence({
-    activities: [{ name: 'CityMart Shoppers 🛒', type: ActivityType.Watching }],
-    status: 'online'
-  });
 
-  // Presence refresh for resilience
+  // Initial presence (before we know the member count)
+  updatePresence();
+
+  // Presence refresh for resilience (uses same helper)
   setInterval(() => {
-    const label = lastMemberCount
-      ? `${lastMemberCount.toLocaleString()} Shoppers`
-      : 'CityMart Shoppers 🛒';
-    client.user.setPresence({
-      activities: [{ name: label, type: ActivityType.Watching }],
-      status: 'online'
-    });
+    updatePresence();
   }, 10 * 60 * 1000);
 
   // Fun randomized "I'm back!" message to #general
