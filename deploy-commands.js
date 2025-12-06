@@ -76,7 +76,51 @@ const commands = [
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
     .setName('communitycount')
-    .setDescription('Show the current CityMart Roblox Community member count'))
+    .setDescription('Show the current CityMart Roblox Community member count')),
+
+  // CityMart giveaways (owner-only in handler)
+  noDM(new SlashCommandBuilder()
+    .setName('giveaway')
+    .setDescription('Manage CityMart giveaways')
+    .addSubcommand(sub =>
+      sub
+        .setName('start')
+        .setDescription('Start a new giveaway')
+        .addStringOption(opt =>
+          opt
+            .setName('prize')
+            .setDescription('What are you giving away?')
+            .setRequired(true)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('end')
+            .setDescription('End date & time (YYYY-MM-DD HH:mm)')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('end')
+        .setDescription('End an active giveaway early')
+        .addStringOption(opt =>
+          opt
+            .setName('message_id')
+            .setDescription('Giveaway message ID')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('reroll')
+        .setDescription('Reroll a winner for a finished giveaway')
+        .addStringOption(opt =>
+          opt
+            .setName('message_id')
+            .setDescription('Giveaway message ID')
+            .setRequired(true)
+        )
+    ))
 ].map(c => c.toJSON());
 
 // Set up REST client
