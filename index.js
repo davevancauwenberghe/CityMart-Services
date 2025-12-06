@@ -7,8 +7,7 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActivityType,
-  PermissionFlagsBits
+  ActivityType
 } = require('discord.js');
 const http = require('http');
 const fs   = require('fs');
