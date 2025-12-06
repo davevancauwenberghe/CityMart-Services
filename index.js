@@ -949,8 +949,12 @@ client.on('interactionCreate', async interaction => {
             new ButtonBuilder()
               .setCustomId('giveaway_enter')
               .setLabel('Enter Giveaway')
-              .setStyle(ButtonStyle.Success)
-          );
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId('giveaway_entries')
+              .setLabel('Entrants')
+              .setStyle(ButtonStyle.Secondary)
+);
 
           const msg = await interaction.reply({
             embeds: [embed],
@@ -1150,9 +1154,60 @@ client.on('interactionCreate', async interaction => {
 client.on('interactionCreate', async interaction => {
   try {
     if (!interaction.isButton()) return;
+
     if (interaction.customId === 'giveaway_enter') {
       await handleGiveawayEnterButton(interaction);
+      return;
     }
+
+    if (interaction.customId === 'giveaway_entries') {
+      const msg = interaction.message;
+      if (!msg || !msg.id) {
+        return interaction.reply({
+          content: 'This giveaway is no longer valid.',
+          ephemeral: true
+        });
+      }
+
+      const g = giveaways.get(msg.id);
+      if (!g) {
+        return interaction.reply({
+          content: 'Could not find this giveaway. It may no longer be active.',
+          ephemeral: true
+        });
+      }
+
+      const entrants = g.entrants || [];
+      if (entrants.length === 0) {
+        return interaction.reply({
+          content: 'No one has entered this giveaway yet.',
+          ephemeral: true
+        });
+      }
+
+      const maxToShow = 25;
+      const slice = entrants.slice(0, maxToShow);
+
+      const lines = slice.map((userId, idx) => `**#${idx + 1}** — <@${userId}>`);
+      if (entrants.length > maxToShow) {
+        lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('🎁 Giveaway Entrants')
+        .setColor(0x00ffaa)
+        .setDescription(lines.join('\n'))
+        .setFooter({
+          text: `Giveaway message ID: ${msg.id} • Total entrants: ${entrants.length}`
+        })
+        .setTimestamp();
+
+      return interaction.reply({
+        embeds: [embed],
+        ephemeral: true // change to false if you want it public
+      });
+    }
+
   } catch (err) {
     console.error('Button interaction error:', err);
   }
