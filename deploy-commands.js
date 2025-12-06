@@ -78,7 +78,7 @@ const commands = [
     .setName('communitycount')
     .setDescription('Show the current CityMart Roblox Community member count')),
 
-  // CityMart giveaways (owner-only in handler)
+  // CityMart giveaways (owner-only logic is in handler)
   noDM(new SlashCommandBuilder()
     .setName('giveaway')
     .setDescription('Manage CityMart giveaways')
@@ -95,7 +95,7 @@ const commands = [
         .addStringOption(opt =>
           opt
             .setName('end')
-            .setDescription('End date & time (YYYY-MM-DD HH:mm)')
+            .setDescription('End date & time (YYYY-MM-DD HH:mm UTC)')
             .setRequired(true)
         )
     )
@@ -114,6 +114,17 @@ const commands = [
       sub
         .setName('reroll')
         .setDescription('Reroll a winner for a finished giveaway')
+        .addStringOption(opt =>
+          opt
+            .setName('message_id')
+            .setDescription('Giveaway message ID')
+            .setRequired(true)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('entries')
+        .setDescription('Show all entrants for a giveaway')
         .addStringOption(opt =>
           opt
             .setName('message_id')
