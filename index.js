@@ -14,7 +14,7 @@ const fs   = require('fs');
 const path = require('path');
 
 // ---------------------- CityMart Giveaways ----------------------
-const GIVEAWAYS_FILE = path.join(__dirname, 'data', 'giveaways.json');
+const GIVEAWAYS_FILE = path.join('/data', 'giveaways.json');
 
 // Map<messageId, Giveaway>
 /*
