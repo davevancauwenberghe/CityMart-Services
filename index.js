@@ -302,8 +302,9 @@ const {
   COMMANDS_CHANNEL_ID,
   ROBLOX_GROUP_ID,
   BOT_URL,
-  USER_AGENT, // optional override for outbound HTTP requests
-  GIVEAWAY_MIN_ROLE_ID // 👈 REQUIRED for giveaway eligibility filtering
+  USER_AGENT,
+  GIVEAWAY_MIN_ROLE_ID,
+  EASYPOS_TOKEN
 } = process.env;
 
 if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
@@ -316,6 +317,8 @@ if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblo
 if (!BOT_URL)             console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
 if (!GIVEAWAY_MIN_ROLE_ID)
   console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
+if (!EASYPOS_TOKEN)
+  console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
 
 // Polite identification for outbound requests
 const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
@@ -427,7 +430,6 @@ async function robloxGroupRole(userId, groupId) {
   return role;
 }
 
-// No footer about group membership anymore
 function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
   const profileUrl = `https://www.roblox.com/users/${info.id}/profile`;
   const joined = new Date(info.created);
@@ -479,6 +481,34 @@ function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
     )
   ];
   return { embed, components };
+}
+
+// ---------------------- easyPOS Activity helpers ----------------------
+const EASYPOS_BASE_URL = 'https://papi.easypos.lol';
+
+async function fetchEasyPosActivity(userId) {
+  if (!EASYPOS_TOKEN) {
+    throw new Error('EASYPOS_TOKEN not configured');
+  }
+
+  const res = await fetch(`${EASYPOS_BASE_URL}/activity/data`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify({
+      token: EASYPOS_TOKEN,
+      userId: Number(userId)
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error(`easyPOS HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data; // { success, error?, data? }
 }
 
 // ---------------------- Triggers ----------------------
@@ -879,7 +909,10 @@ client.on('interactionCreate', async interaction => {
     const now  = Date.now();
     const last = userCooldowns.get(user.id) || 0;
     if (now - last < COOLDOWN_MS) {
-      return interaction.reply({ content: '⏳ Please wait a few seconds before using another command.', ephemeral: true });
+      return interaction.reply({
+        content: '⏳ Please wait a few seconds before using another command.',
+        ephemeral: true
+      });
     }
     userCooldowns.set(user.id, now);
 
@@ -923,10 +956,16 @@ client.on('interactionCreate', async interaction => {
       // renamed from /members → /communitycount
       case 'communitycount': {
         if (!allowMembersCheck(user.id)) {
-          return interaction.reply({ content: '⏳ Please wait a bit before checking member counts again.', ephemeral: true });
+          return interaction.reply({
+            content: '⏳ Please wait a bit before checking member counts again.',
+            ephemeral: true
+          });
         }
         if (!ROBLOX_GROUP_ID) {
-          return interaction.reply({ content: '⚠️ ROBLOX_GROUP_ID not configured.', ephemeral: true });
+          return interaction.reply({
+            content: '⚠️ ROBLOX_GROUP_ID not configured.',
+            ephemeral: true
+          });
         }
         await interaction.deferReply();
         try {
@@ -948,217 +987,302 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
+      // easyPOS activity
+      case 'activity': {
+        const username = interaction.options.getString('username', true);
+
+        if (!EASYPOS_TOKEN) {
+          return interaction.reply({
+            content: '⚠️ Activity tracking is not configured on this bot. (EASYPOS_TOKEN missing)',
+            ephemeral: false
+          });
+        }
+
+        await interaction.deferReply(); // public
+
+        try {
+          // 1) Resolve username -> Roblox userId
+          const userId = await robloxUsernameToId(username);
+          if (!userId) {
+            return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
+          }
+
+          // 2) Fetch Roblox profile + avatar + easyPOS activity in parallel
+          const [info, avatarUrl, activity] = await Promise.all([
+            robloxUserInfo(userId),
+            robloxAvatarThumb(userId),
+            fetchEasyPosActivity(userId)
+          ]);
+
+          if (!activity || activity.success === false || !activity.data) {
+            const errText = activity?.error || 'Unknown error from easyPOS.';
+            return interaction.editReply(
+              `❌ Could not fetch activity for **${info.displayName ?? info.name}**.\nReason: \`${errText}\``
+            );
+          }
+
+          const a  = activity.data;
+          const pt = a.playtime  || {};
+          const msg = a.messages || {};
+          const pf = pt.formatted || {};
+
+          const inGameText = a.inGame ? '🟢 In-game now' : '⚪ Not currently in-game';
+
+          const playtimeLines = [];
+          if (pf.total) playtimeLines.push(`Total: **${pf.total}**`);
+          if (pf.month) playtimeLines.push(`This month: **${pf.month}**`);
+          if (pf.week)  playtimeLines.push(`This week: **${pf.week}**`);
+          if (typeof pt.position === 'number') {
+            playtimeLines.push(`Leaderboard position: **#${pt.position}**`);
+          }
+
+          const messageLines = [];
+          if (typeof msg.total === 'number') messageLines.push(`Total: **${msg.total.toLocaleString()}**`);
+          if (typeof msg.month === 'number') messageLines.push(`This month: **${msg.month.toLocaleString()}**`);
+          if (typeof msg.week === 'number')  messageLines.push(`This week: **${msg.week.toLocaleString()}**`);
+          if (typeof msg.position === 'number') {
+            messageLines.push(`Leaderboard position: **#${msg.position}**`);
+          }
+
+          const embed = new EmbedBuilder()
+            .setTitle(`Activity — ${info.displayName ?? info.name}`)
+            .setURL(`https://www.roblox.com/users/${info.id}/profile`)
+            .setThumbnail(avatarUrl || THUMBNAIL_URL)
+            .setColor(0x00ffaa)
+            .setDescription(inGameText)
+            .addFields(
+              {
+                name: '🕒 Playtime',
+                value: playtimeLines.length ? playtimeLines.join('\n') : 'No playtime data available.',
+                inline: false
+              },
+              {
+                name: '💬 Messages',
+                value: messageLines.length ? messageLines.join('\n') : 'No message data available.',
+                inline: false
+              }
+            )
+            .setFooter({ text: 'Data provided by easyPOS' })
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [embed] });
+        } catch (err) {
+          console.error('activity/easyPOS error:', err);
+          return interaction.editReply('❌ Something went wrong fetching that activity. Try again later.');
+        }
+      }
+
       case 'giveaway': {
-  if (!interaction.guild) {
-    return interaction.reply({
-      content: 'This command can only be used inside a server.',
-      ephemeral: true
-    });
-  }
+        if (!interaction.guild) {
+          return interaction.reply({
+            content: 'This command can only be used inside a server.',
+            ephemeral: true
+          });
+        }
 
-  const sub = interaction.options.getSubcommand();
+        const sub = interaction.options.getSubcommand();
 
-  // Owner-only for management subcommands (start/end/reroll/removeentrant), but NOT for "entries"
-  if (['start', 'end', 'reroll', 'removeentrant'].includes(sub) &&
-      interaction.guild.ownerId !== user.id) {
-    return interaction.reply({
-      content: 'Only the server owner can start, end, reroll or modify entrants for giveaways.',
-      ephemeral: true
-    });
-  }
+        // Owner-only for management subcommands (start/end/reroll/removeentrant), but NOT for "entries"
+        if (['start', 'end', 'reroll', 'removeentrant'].includes(sub) &&
+            interaction.guild.ownerId !== user.id) {
+          return interaction.reply({
+            content: 'Only the server owner can start, end, reroll or modify entrants for giveaways.',
+            ephemeral: true
+          });
+        }
 
-  if (sub === 'start') {
-    const prize = interaction.options.getString('prize', true);
-    const endInput = interaction.options.getString('end', true);
+        if (sub === 'start') {
+          const prize = interaction.options.getString('prize', true);
+          const endInput = interaction.options.getString('end', true);
 
-    const endAt = parseGiveawayEnd(endInput);
-    if (!endAt || endAt <= Date.now()) {
-      return interaction.reply({
-        content: 'Invalid end time. Use format `YYYY-MM-DD HH:mm` and make sure it is in the future.',
-        ephemeral: true
-      });
-    }
+          const endAt = parseGiveawayEnd(endInput);
+          if (!endAt || endAt <= Date.now()) {
+            return interaction.reply({
+              content: 'Invalid end time. Use format `YYYY-MM-DD HH:mm` and make sure it is in the future.',
+              ephemeral: true
+            });
+          }
 
-    const endTs = Math.floor(endAt / 1000); // Unix seconds
+          const endTs = Math.floor(endAt / 1000); // Unix seconds
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎁 CityMart Giveaway')
-      .setColor(0xffc107)
-      .setThumbnail(THUMBNAIL_URL)
-      .setDescription(
-        [
-          `Prize: **${prize}**`,
-          '',
-          'Click the button below to enter!',
-          '',
-          `Ends: <t:${endTs}:F> (<t:${endTs}:R>)`
-        ].join('\n')
-      )
-      .setFooter({ text: `Hosted by ${interaction.user.tag}` })
-      .setTimestamp();
+          const embed = new EmbedBuilder()
+            .setTitle('🎁 CityMart Giveaway')
+            .setColor(0xffc107)
+            .setThumbnail(THUMBNAIL_URL)
+            .setDescription(
+              [
+                `Prize: **${prize}**`,
+                '',
+                'Click the button below to enter!',
+                '',
+                `Ends: <t:${endTs}:F> (<t:${endTs}:R>)`
+              ].join('\n')
+            )
+            .setFooter({ text: `Hosted by ${interaction.user.tag}` })
+            .setTimestamp();
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('giveaway_enter')
-        .setLabel('Enter Giveaway')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId('giveaway_entries')
-        .setLabel('Entrants')
-        .setStyle(ButtonStyle.Secondary)
-    );
+          const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+              .setCustomId('giveaway_enter')
+              .setLabel('Enter Giveaway')
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId('giveaway_entries')
+              .setLabel('Entrants')
+              .setStyle(ButtonStyle.Secondary)
+          );
 
-    const msg = await interaction.reply({
-      embeds: [embed],
-      components: [row],
-      fetchReply: true
-    });
+          const msg = await interaction.reply({
+            embeds: [embed],
+            components: [row],
+            fetchReply: true
+          });
 
-    giveaways.set(msg.id, {
-      messageId: msg.id,
-      channelId: msg.channel.id,
-      guildId: msg.guildId,
-      prize,
-      endAt,
-      createdBy: interaction.user.id,
-      entrants: [],
-      ended: false,
-      winnerId: null
-    });
-    saveGiveawaysToDisk();
-    break;
-  }
+          giveaways.set(msg.id, {
+            messageId: msg.id,
+            channelId: msg.channel.id,
+            guildId: msg.guildId,
+            prize,
+            endAt,
+            createdBy: interaction.user.id,
+            entrants: [],
+            ended: false,
+            winnerId: null
+          });
+          saveGiveawaysToDisk();
+          break;
+        }
 
-  if (sub === 'end') {
-    const messageId = interaction.options.getString('message_id', true);
-    const g = giveaways.get(messageId);
-    if (!g) {
-      return interaction.reply({
-        content: 'Could not find that giveaway. Make sure the message ID is correct.',
-        ephemeral: true
-      });
-    }
-    if (g.ended) {
-      return interaction.reply({
-        content: 'That giveaway has already ended.',
-        ephemeral: true
-      });
-    }
-    await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
-    await endGiveaway(messageId, g, { reroll: false });
-    g.ended = true;
-    saveGiveawaysToDisk();
-    break;
-  }
+        if (sub === 'end') {
+          const messageId = interaction.options.getString('message_id', true);
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: 'Could not find that giveaway. Make sure the message ID is correct.',
+              ephemeral: true
+            });
+          }
+          if (g.ended) {
+            return interaction.reply({
+              content: 'That giveaway has already ended.',
+              ephemeral: true
+            });
+          }
+          await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
+          await endGiveaway(messageId, g, { reroll: false });
+          g.ended = true;
+          saveGiveawaysToDisk();
+          break;
+        }
 
-  if (sub === 'reroll') {
-    const messageId = interaction.options.getString('message_id', true);
-    const g = giveaways.get(messageId);
-    if (!g) {
-      return interaction.reply({
-        content: 'Could not find that giveaway. Make sure the message ID is correct.',
-        ephemeral: true
-      });
-    }
-    if (!g.ended) {
-      return interaction.reply({
-        content: 'You can only reroll a giveaway that has already ended.',
-        ephemeral: true
-      });
-    }
-    if (!g.entrants || g.entrants.length === 0) {
-      return interaction.reply({
-        content: 'There are no entrants to reroll from.',
-        ephemeral: true
-      });
-    }
+        if (sub === 'reroll') {
+          const messageId = interaction.options.getString('message_id', true);
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: 'Could not find that giveaway. Make sure the message ID is correct.',
+              ephemeral: true
+            });
+          }
+          if (!g.ended) {
+            return interaction.reply({
+              content: 'You can only reroll a giveaway that has already ended.',
+              ephemeral: true
+            });
+          }
+          if (!g.entrants || g.entrants.length === 0) {
+            return interaction.reply({
+              content: 'There are no entrants to reroll from.',
+              ephemeral: true
+            });
+          }
 
-    await interaction.reply({ content: 'Rerolling giveaway winner...', ephemeral: true });
-    await endGiveaway(messageId, g, { reroll: true });
-    break;
-  }
+          await interaction.reply({ content: 'Rerolling giveaway winner...', ephemeral: true });
+          await endGiveaway(messageId, g, { reroll: true });
+          break;
+        }
 
-  if (sub === 'entries') {
-    const messageId = interaction.options.getString('message_id', true);
-    const g = giveaways.get(messageId);
-    if (!g) {
-      return interaction.reply({
-        content: 'Could not find that giveaway. Make sure the message ID is correct.',
-        ephemeral: true
-      });
-    }
+        if (sub === 'entries') {
+          const messageId = interaction.options.getString('message_id', true);
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: 'Could not find that giveaway. Make sure the message ID is correct.',
+              ephemeral: true
+            });
+          }
 
-    const entrants = g.entrants || [];
-    if (entrants.length === 0) {
-      return interaction.reply({
-        content: 'No one has entered this giveaway yet.',
-        ephemeral: true
-      });
-    }
+          const entrants = g.entrants || [];
+          if (entrants.length === 0) {
+            return interaction.reply({
+              content: 'No one has entered this giveaway yet.',
+              ephemeral: true
+            });
+          }
 
-    // Show up to 25 entrants in a single message
-    const maxToShow = 25;
-    const slice = entrants.slice(0, maxToShow);
+          // Show up to 25 entrants in a single message
+          const maxToShow = 25;
+          const slice = entrants.slice(0, maxToShow);
 
-    const lines = slice.map((userId, idx) => {
-      return `**#${idx + 1}** — <@${userId}>`;
-    });
+          const lines = slice.map((userId, idx) => {
+            return `**#${idx + 1}** — <@${userId}>`;
+          });
 
-    if (entrants.length > maxToShow) {
-      lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
-    }
+          if (entrants.length > maxToShow) {
+            lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
+          }
 
-    const embed = new EmbedBuilder()
-      .setTitle('🎁 Giveaway Entries')
-      .setColor(0x00ffaa)
-      .setDescription(lines.join('\n'))
-      .setFooter({
-        text: `Giveaway message ID: ${messageId} • Total entrants: ${entrants.length}`
-      })
-      .setTimestamp();
+          const embed = new EmbedBuilder()
+            .setTitle('🎁 Giveaway Entries')
+            .setColor(0x00ffaa)
+            .setDescription(lines.join('\n'))
+            .setFooter({
+              text: `Giveaway message ID: ${messageId} • Total entrants: ${entrants.length}`
+            })
+            .setTimestamp();
 
-    return interaction.reply({ embeds: [embed], ephemeral: false });
-  }
+          return interaction.reply({ embeds: [embed], ephemeral: false });
+        }
 
-  if (sub === 'removeentrant') {
-    const messageId = interaction.options.getString('message_id', true);
-    const targetUser = interaction.options.getUser('user', true);
+        if (sub === 'removeentrant') {
+          const messageId = interaction.options.getString('message_id', true);
+          const targetUser = interaction.options.getUser('user', true);
 
-    const g = giveaways.get(messageId);
-    if (!g) {
-      return interaction.reply({
-        content: '❌ I couldn’t find a giveaway with that message ID.',
-        ephemeral: true
-      });
-    }
+          const g = giveaways.get(messageId);
+          if (!g) {
+            return interaction.reply({
+              content: '❌ I couldn’t find a giveaway with that message ID.',
+              ephemeral: true
+            });
+          }
 
-    if (g.ended || Date.now() >= g.endAt) {
-      return interaction.reply({
-        content: '⚠️ This giveaway has already ended. You can’t modify entrants anymore.',
-        ephemeral: true
-      });
-    }
+          if (g.ended || Date.now() >= g.endAt) {
+            return interaction.reply({
+              content: '⚠️ This giveaway has already ended. You can’t modify entrants anymore.',
+              ephemeral: true
+            });
+          }
 
-    const before = g.entrants.length;
-    g.entrants = g.entrants.filter(id => id !== targetUser.id);
+          const before = g.entrants.length;
+          g.entrants = g.entrants.filter(id => id !== targetUser.id);
 
-    if (g.entrants.length === before) {
-      return interaction.reply({
-        content: `ℹ️ <@${targetUser.id}> is not currently entered in this giveaway.`,
-        ephemeral: true
-      });
-    }
+          if (g.entrants.length === before) {
+            return interaction.reply({
+              content: `ℹ️ <@${targetUser.id}> is not currently entered in this giveaway.`,
+              ephemeral: true
+            });
+          }
 
-    saveGiveawaysToDisk();
+          saveGiveawaysToDisk();
 
-    return interaction.reply({
-      content: `✅ Removed <@${targetUser.id}> from this giveaway.`,
-      ephemeral: true
-    });
-  }
+          return interaction.reply({
+            content: `✅ Removed <@${targetUser.id}> from this giveaway.`,
+            ephemeral: true
+          });
+        }
 
-  break;
-}
+        break;
+      }
 
       // hallAI bridge
       case 'ask': {
@@ -1235,7 +1359,10 @@ client.on('interactionCreate', async interaction => {
   } catch (err) {
     console.error('Error in interactionCreate:', err);
     if (interaction && !interaction.replied) {
-      interaction.reply({ content: '⚠️ An internal error occurred.', ephemeral: true }).catch(() => {});
+      interaction.reply({
+        content: '⚠️ An internal error occurred.',
+        ephemeral: true
+      }).catch(() => {});
     }
   }
 });
