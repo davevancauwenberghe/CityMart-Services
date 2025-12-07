@@ -131,6 +131,23 @@ const commands = [
             .setDescription('Giveaway message ID')
             .setRequired(true)
         )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('removeentrant')
+        .setDescription('Remove a user from a giveaway')
+        .addStringOption(opt =>
+          opt
+            .setName('message_id')
+            .setDescription('Giveaway message ID')
+            .setRequired(true)
+        )
+        .addUserOption(opt =>
+          opt
+            .setName('user')
+            .setDescription('User to remove from the giveaway')
+            .setRequired(true)
+        )
     ))
 ].map(c => c.toJSON());
 
