@@ -73,6 +73,18 @@ const commands = [
         .setMaxLength(20)
     )),
 
+  // Player activity via easyPOS
+  noDM(new SlashCommandBuilder()
+    .setName('activity')
+    .setDescription('Show Roblox player activity (easyPOS)')
+    .addStringOption(opt =>
+      opt
+        .setName('username')
+        .setDescription('Roblox username to look up')
+        .setRequired(true)
+        .setMaxLength(20)
+    )),
+
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
     .setName('communitycount')
