@@ -949,177 +949,216 @@ client.on('interactionCreate', async interaction => {
       }
 
       case 'giveaway': {
-        if (!interaction.guild) {
-          return interaction.reply({
-            content: 'This command can only be used inside a server.',
-            ephemeral: true
-          });
-        }
+  if (!interaction.guild) {
+    return interaction.reply({
+      content: 'This command can only be used inside a server.',
+      ephemeral: true
+    });
+  }
 
-        const sub = interaction.options.getSubcommand();
+  const sub = interaction.options.getSubcommand();
 
-        // Owner-only for management subcommands, but NOT for "entries"
-        if (sub !== 'entries' && interaction.guild.ownerId !== user.id) {
-          return interaction.reply({
-            content: 'Only the server owner can start, end or reroll giveaways.',
-            ephemeral: true
-          });
-        }
+  // Owner-only for management subcommands (start/end/reroll/removeentrant), but NOT for "entries"
+  if (['start', 'end', 'reroll', 'removeentrant'].includes(sub) &&
+      interaction.guild.ownerId !== user.id) {
+    return interaction.reply({
+      content: 'Only the server owner can start, end, reroll or modify entrants for giveaways.',
+      ephemeral: true
+    });
+  }
 
-        if (sub === 'start') {
-          const prize = interaction.options.getString('prize', true);
-          const endInput = interaction.options.getString('end', true);
+  if (sub === 'start') {
+    const prize = interaction.options.getString('prize', true);
+    const endInput = interaction.options.getString('end', true);
 
-          const endAt = parseGiveawayEnd(endInput);
-          if (!endAt || endAt <= Date.now()) {
-            return interaction.reply({
-              content: 'Invalid end time. Use format `YYYY-MM-DD HH:mm` and make sure it is in the future.',
-              ephemeral: true
-            });
-          }
+    const endAt = parseGiveawayEnd(endInput);
+    if (!endAt || endAt <= Date.now()) {
+      return interaction.reply({
+        content: 'Invalid end time. Use format `YYYY-MM-DD HH:mm` and make sure it is in the future.',
+        ephemeral: true
+      });
+    }
 
-          const endTs = Math.floor(endAt / 1000); // Unix seconds
+    const endTs = Math.floor(endAt / 1000); // Unix seconds
 
-          const embed = new EmbedBuilder()
-            .setTitle('🎁 CityMart Giveaway')
-            .setColor(0xffc107)
-            .setThumbnail(THUMBNAIL_URL)
-            .setDescription(
-              [
-                `Prize: **${prize}**`,
-                '',
-                'Click the button below to enter!',
-                '',
-                `Ends: <t:${endTs}:F> (<t:${endTs}:R>)`
-              ].join('\n')
-            )
-            .setFooter({ text: `Hosted by ${interaction.user.tag}` })
-            .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle('🎁 CityMart Giveaway')
+      .setColor(0xffc107)
+      .setThumbnail(THUMBNAIL_URL)
+      .setDescription(
+        [
+          `Prize: **${prize}**`,
+          '',
+          'Click the button below to enter!',
+          '',
+          `Ends: <t:${endTs}:F> (<t:${endTs}:R>)`
+        ].join('\n')
+      )
+      .setFooter({ text: `Hosted by ${interaction.user.tag}` })
+      .setTimestamp();
 
-          const row = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-              .setCustomId('giveaway_enter')
-              .setLabel('Enter Giveaway')
-              .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-              .setCustomId('giveaway_entries')
-              .setLabel('Entrants')
-              .setStyle(ButtonStyle.Secondary)
-);
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('giveaway_enter')
+        .setLabel('Enter Giveaway')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId('giveaway_entries')
+        .setLabel('Entrants')
+        .setStyle(ButtonStyle.Secondary)
+    );
 
-          const msg = await interaction.reply({
-            embeds: [embed],
-            components: [row],
-            fetchReply: true
-          });
+    const msg = await interaction.reply({
+      embeds: [embed],
+      components: [row],
+      fetchReply: true
+    });
 
-          giveaways.set(msg.id, {
-            messageId: msg.id,
-            channelId: msg.channel.id,
-            guildId: msg.guildId,
-            prize,
-            endAt,
-            createdBy: interaction.user.id,
-            entrants: [],
-            ended: false,
-            winnerId: null
-          });
-          saveGiveawaysToDisk();
-          break;
-        }
+    giveaways.set(msg.id, {
+      messageId: msg.id,
+      channelId: msg.channel.id,
+      guildId: msg.guildId,
+      prize,
+      endAt,
+      createdBy: interaction.user.id,
+      entrants: [],
+      ended: false,
+      winnerId: null
+    });
+    saveGiveawaysToDisk();
+    break;
+  }
 
-        if (sub === 'end') {
-          const messageId = interaction.options.getString('message_id', true);
-          const g = giveaways.get(messageId);
-          if (!g) {
-            return interaction.reply({
-              content: 'Could not find that giveaway. Make sure the message ID is correct.',
-              ephemeral: true
-            });
-          }
-          if (g.ended) {
-            return interaction.reply({
-              content: 'That giveaway has already ended.',
-              ephemeral: true
-            });
-          }
-          await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
-          await endGiveaway(messageId, g, { reroll: false });
-          g.ended = true;
-          break;
-        }
+  if (sub === 'end') {
+    const messageId = interaction.options.getString('message_id', true);
+    const g = giveaways.get(messageId);
+    if (!g) {
+      return interaction.reply({
+        content: 'Could not find that giveaway. Make sure the message ID is correct.',
+        ephemeral: true
+      });
+    }
+    if (g.ended) {
+      return interaction.reply({
+        content: 'That giveaway has already ended.',
+        ephemeral: true
+      });
+    }
+    await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
+    await endGiveaway(messageId, g, { reroll: false });
+    g.ended = true;
+    saveGiveawaysToDisk();
+    break;
+  }
 
-        if (sub === 'reroll') {
-          const messageId = interaction.options.getString('message_id', true);
-          const g = giveaways.get(messageId);
-          if (!g) {
-            return interaction.reply({
-              content: 'Could not find that giveaway. Make sure the message ID is correct.',
-              ephemeral: true
-            });
-          }
-          if (!g.ended) {
-            return interaction.reply({
-              content: 'You can only reroll a giveaway that has already ended.',
-              ephemeral: true
-            });
-          }
-          if (!g.entrants || g.entrants.length === 0) {
-            return interaction.reply({
-              content: 'There are no entrants to reroll from.',
-              ephemeral: true
-            });
-          }
+  if (sub === 'reroll') {
+    const messageId = interaction.options.getString('message_id', true);
+    const g = giveaways.get(messageId);
+    if (!g) {
+      return interaction.reply({
+        content: 'Could not find that giveaway. Make sure the message ID is correct.',
+        ephemeral: true
+      });
+    }
+    if (!g.ended) {
+      return interaction.reply({
+        content: 'You can only reroll a giveaway that has already ended.',
+        ephemeral: true
+      });
+    }
+    if (!g.entrants || g.entrants.length === 0) {
+      return interaction.reply({
+        content: 'There are no entrants to reroll from.',
+        ephemeral: true
+      });
+    }
 
-          await interaction.reply({ content: 'Rerolling giveaway winner...', ephemeral: true });
-          await endGiveaway(messageId, g, { reroll: true });
-          break;
-        }
+    await interaction.reply({ content: 'Rerolling giveaway winner...', ephemeral: true });
+    await endGiveaway(messageId, g, { reroll: true });
+    break;
+  }
 
-        if (sub === 'entries') {
-          const messageId = interaction.options.getString('message_id', true);
-          const g = giveaways.get(messageId);
-          if (!g) {
-            return interaction.reply({
-              content: 'Could not find that giveaway. Make sure the message ID is correct.',
-              ephemeral: true
-            });
-          }
+  if (sub === 'entries') {
+    const messageId = interaction.options.getString('message_id', true);
+    const g = giveaways.get(messageId);
+    if (!g) {
+      return interaction.reply({
+        content: 'Could not find that giveaway. Make sure the message ID is correct.',
+        ephemeral: true
+      });
+    }
 
-          const entrants = g.entrants || [];
-          if (entrants.length === 0) {
-            return interaction.reply({
-              content: 'No one has entered this giveaway yet.',
-              ephemeral: true
-            });
-          }
+    const entrants = g.entrants || [];
+    if (entrants.length === 0) {
+      return interaction.reply({
+        content: 'No one has entered this giveaway yet.',
+        ephemeral: true
+      });
+    }
 
-          // Show up to 25 entrants in a single message
-          const maxToShow = 25;
-          const slice = entrants.slice(0, maxToShow);
+    // Show up to 25 entrants in a single message
+    const maxToShow = 25;
+    const slice = entrants.slice(0, maxToShow);
 
-          const lines = slice.map((userId, idx) => {
-            return `**#${idx + 1}** — <@${userId}>`;
-          });
+    const lines = slice.map((userId, idx) => {
+      return `**#${idx + 1}** — <@${userId}>`;
+    });
 
-          if (entrants.length > maxToShow) {
-            lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
-          }
+    if (entrants.length > maxToShow) {
+      lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
+    }
 
-          const embed = new EmbedBuilder()
-            .setTitle('🎁 Giveaway Entries')
-            .setColor(0x00ffaa)
-            .setDescription(lines.join('\n'))
-            .setFooter({
-              text: `Giveaway message ID: ${messageId} • Total entrants: ${entrants.length}`
-            })
-            .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setTitle('🎁 Giveaway Entries')
+      .setColor(0x00ffaa)
+      .setDescription(lines.join('\n'))
+      .setFooter({
+        text: `Giveaway message ID: ${messageId} • Total entrants: ${entrants.length}`
+      })
+      .setTimestamp();
 
-          return interaction.reply({ embeds: [embed], ephemeral: false });
-        }
+    return interaction.reply({ embeds: [embed], ephemeral: false });
+  }
 
-        break;
-      }
+  if (sub === 'removeentrant') {
+    const messageId = interaction.options.getString('message_id', true);
+    const targetUser = interaction.options.getUser('user', true);
+
+    const g = giveaways.get(messageId);
+    if (!g) {
+      return interaction.reply({
+        content: '❌ I couldn’t find a giveaway with that message ID.',
+        ephemeral: true
+      });
+    }
+
+    if (g.ended || Date.now() >= g.endAt) {
+      return interaction.reply({
+        content: '⚠️ This giveaway has already ended. You can’t modify entrants anymore.',
+        ephemeral: true
+      });
+    }
+
+    const before = g.entrants.length;
+    g.entrants = g.entrants.filter(id => id !== targetUser.id);
+
+    if (g.entrants.length === before) {
+      return interaction.reply({
+        content: `ℹ️ <@${targetUser.id}> is not currently entered in this giveaway.`,
+        ephemeral: true
+      });
+    }
+
+    saveGiveawaysToDisk();
+
+    return interaction.reply({
+      content: `✅ Removed <@${targetUser.id}> from this giveaway.`,
+      ephemeral: true
+    });
+  }
+
+  break;
+}
 
       // hallAI bridge
       case 'ask': {
