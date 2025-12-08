@@ -1170,7 +1170,7 @@ client.on('interactionCreate', async interaction => {
             .setURL(`https://www.roblox.com/users/${info.id}/profile`)
             .setThumbnail(THUMBNAIL_URL)
             .setColor(0xffc107)
-            .setDescription(`Total donated: **${amount.toLocaleString()}**`)
+            .setDescription(`Total donated: **R$ ${amount.toLocaleString()}**`)
             .setFooter({ text: 'Donations data provided by easyPOS' })
             .setTimestamp();
 
@@ -1236,7 +1236,7 @@ client.on('interactionCreate', async interaction => {
             const tag = r.username
               ? `[@${r.username}](https://www.roblox.com/users/${r.userId}/profile)`
               : `User ID: ${r.userId}`;
-            return `**#${idx + 1}** — ${r.name} (${tag}) — **${r.amount.toLocaleString()}**`;
+            return `**#${idx + 1}** — ${r.name} (${tag}) — **R$ ${r.amount.toLocaleString()}**`;
           });
 
           const embed = new EmbedBuilder()
