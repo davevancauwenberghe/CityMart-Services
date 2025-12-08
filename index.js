@@ -304,7 +304,8 @@ const {
   BOT_URL,
   USER_AGENT,
   GIVEAWAY_MIN_ROLE_ID,
-  EASYPOS_TOKEN
+  EASYPOS_TOKEN,           // easyPOS Activity
+  EASYPOS_DONATIONS_TOKEN  // easyPOS Donations
 } = process.env;
 
 if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
@@ -319,6 +320,8 @@ if (!GIVEAWAY_MIN_ROLE_ID)
   console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
 if (!EASYPOS_TOKEN)
   console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
+if (!EASYPOS_DONATIONS_TOKEN)
+  console.warn('⚠️ EASYPOS_DONATIONS_TOKEN not set — /donations and /donationsleaderboard will be disabled.');
 
 // Polite identification for outbound requests
 const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
@@ -1069,6 +1072,128 @@ client.on('interactionCreate', async interaction => {
         } catch (err) {
           console.error('activity/easyPOS error:', err);
           return interaction.editReply('❌ Something went wrong fetching that activity. Try again later.');
+        }
+      }
+
+      // easyPOS donations
+      case 'donations': {
+        const username = interaction.options.getString('username', true);
+
+        if (!EASYPOS_DONATIONS_TOKEN) {
+          return interaction.reply({
+            content: '⚠️ Donations tracking is not configured on this bot. (EASYPOS_DONATIONS_TOKEN missing)',
+            ephemeral: false
+          });
+        }
+
+        await interaction.deferReply(); // public
+
+        try {
+          const userId = await robloxUsernameToId(username);
+          if (!userId) {
+            return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
+          }
+
+          const [info, donations] = await Promise.all([
+            robloxUserInfo(userId),
+            fetchEasyPosDonations(userId)
+          ]);
+
+          if (!donations || donations.success === false || !donations.data) {
+            const errText = donations?.error || 'Unknown error from easyPOS.';
+            return interaction.editReply(
+              `❌ Could not fetch donations for **${info.displayName ?? info.name}**.\nReason: \`${errText}\``
+            );
+          }
+
+          const d = donations.data;
+          const amount = typeof d.amount === 'number' ? d.amount : 0;
+
+          const embed = new EmbedBuilder()
+            .setTitle(`Donations — ${info.displayName ?? info.name}`)
+            .setURL(`https://www.roblox.com/users/${info.id}/profile`)
+            .setThumbnail(THUMBNAIL_URL)
+            .setColor(0xffc107)
+            .setDescription(
+              `Total donated: **${amount.toLocaleString()}**`
+            )
+            .setFooter({ text: 'Donations data provided by easyPOS' })
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [embed] });
+        } catch (err) {
+          console.error('donations/easyPOS error:', err);
+          return interaction.editReply('❌ Something went wrong fetching those donations. Try again later.');
+        }
+      }
+
+      // easyPOS donations — leaderboard
+      case 'donationsleaderboard': {
+        if (!EASYPOS_DONATIONS_TOKEN) {
+          return interaction.reply({
+            content: '⚠️ Donations tracking is not configured on this bot. (EASYPOS_DONATIONS_TOKEN missing)',
+            ephemeral: false
+          });
+        }
+
+        await interaction.deferReply(); // public
+
+        try {
+          const leaderboard = await fetchEasyPosDonationsLeaderboard();
+
+          if (!leaderboard || leaderboard.success === false || !leaderboard.data) {
+            const errText = leaderboard?.error || 'Unknown error from easyPOS.';
+            return interaction.editReply(
+              `❌ Could not fetch donations leaderboard.\nReason: \`${errText}\``
+            );
+          }
+
+          const entries = Array.isArray(leaderboard.data.donations)
+            ? leaderboard.data.donations.slice(0, 10)
+            : [];
+
+          if (entries.length === 0) {
+            return interaction.editReply('No donations found on this key yet.');
+          }
+
+          // Resolve Roblox display names for each userId
+          const resolved = await Promise.all(entries.map(async (entry) => {
+            try {
+              const info = await robloxUserInfo(Number(entry.userId));
+              return {
+                userId: entry.userId,
+                amount: entry.amount,
+                name: info.displayName ?? info.name,
+                username: info.name
+              };
+            } catch {
+              return {
+                userId: entry.userId,
+                amount: entry.amount,
+                name: `User ${entry.userId}`,
+                username: null
+              };
+            }
+          }));
+
+          const lines = resolved.map((r, idx) => {
+            const tag = r.username
+              ? `[@${r.username}](https://www.roblox.com/users/${r.userId}/profile)`
+              : `User ID: ${r.userId}`;
+            return `**#${idx + 1}** — ${r.name} (${tag}) — **${r.amount.toLocaleString()}**`;
+          });
+
+          const embed = new EmbedBuilder()
+            .setTitle('💝 Top Donations')
+            .setColor(0xff6fb5)
+            .setDescription(lines.join('\n'))
+            .setFooter({ text: 'Donations leaderboard provided by easyPOS' })
+            .setTimestamp();
+
+          return interaction.editReply({ embeds: [embed] });
+        } catch (err) {
+          console.error('donationsleaderboard/easyPOS error:', err);
+          return interaction.editReply('❌ Something went wrong fetching the donations leaderboard. Try again later.');
         }
       }
 
