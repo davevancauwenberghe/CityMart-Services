@@ -304,8 +304,10 @@ const {
   BOT_URL,
   USER_AGENT,
   GIVEAWAY_MIN_ROLE_ID,
-  EASYPOS_TOKEN,           // easyPOS Activity
-  EASYPOS_DONATIONS_TOKEN  // easyPOS Donations
+  EASYPOS_TOKEN,
+  EASYPOS_DONATIONS_TOKEN,
+  EASYPOS_RANKING_TOKEN,
+  EASYPOS_RANKING_MOD_ID
 } = process.env;
 
 if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
@@ -322,6 +324,10 @@ if (!EASYPOS_TOKEN)
   console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
 if (!EASYPOS_DONATIONS_TOKEN)
   console.warn('⚠️ EASYPOS_DONATIONS_TOKEN not set — /donations and /donationsleaderboard will be disabled.');
+if (!EASYPOS_RANKING_TOKEN)
+  console.warn('⚠️ EASYPOS_RANKING_TOKEN not set — /ranking commands will be disabled.');
+if (!EASYPOS_RANKING_MOD_ID)
+  console.warn('⚠️ EASYPOS_RANKING_MOD_ID not set — /ranking has no modId to send to easyPOS.');
 
 // Polite identification for outbound requests
 const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
@@ -565,6 +571,72 @@ async function fetchEasyPosDonationsLeaderboard() {
 
   const body = await res.json();
   // Shape: { success: boolean, error?: string, data?: { donations: [...] } }
+  return body;
+}
+
+// ---------------------- easyPOS Ranking helpers ----------------------
+async function fetchEasyPosPromote(userId, modId, scaleCode) {
+  if (!EASYPOS_RANKING_TOKEN) {
+    throw new Error('EASYPOS_RANKING_TOKEN not configured');
+  }
+
+  const payload = {
+    token: EASYPOS_RANKING_TOKEN,
+    userId: Number(userId),
+    modId: Number(modId)
+  };
+
+  // Only required if on minimum rank – we pass it if provided
+  if (scaleCode) {
+    payload.scaleCode = String(scaleCode);
+  }
+
+  const res = await fetch(`${EASYPOS_BASE_URL}/ranking/promote`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`easyPOS ranking/promote HTTP ${res.status}: ${text}`);
+  }
+
+  const body = await res.json();
+  // body: { success, error?, data?: { rank? } }
+  return body;
+}
+
+async function fetchEasyPosDemote(userId, modId) {
+  if (!EASYPOS_RANKING_TOKEN) {
+    throw new Error('EASYPOS_RANKING_TOKEN not configured');
+  }
+
+  const payload = {
+    token: EASYPOS_RANKING_TOKEN,
+    userId: Number(userId),
+    modId: Number(modId)
+  };
+
+  const res = await fetch(`${EASYPOS_BASE_URL}/ranking/demote`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`easyPOS ranking/demote HTTP ${res.status}: ${text}`);
+  }
+
+  const body = await res.json();
+  // body: { success, error?, data?: { rank? } }
   return body;
 }
 
@@ -1250,6 +1322,116 @@ client.on('interactionCreate', async interaction => {
         } catch (err) {
           console.error('donationsleaderboard/easyPOS error:', err);
           return interaction.editReply('❌ Something went wrong fetching the donations leaderboard. Try again later.');
+        }
+      }
+      // easyPOS ranking
+      case 'ranking': {
+        if (!interaction.guild) {
+          return interaction.reply({
+            content: 'This command can only be used inside a server.',
+            ephemeral: true
+          });
+        }
+
+        if (interaction.guild.ownerId !== user.id) {
+          return interaction.reply({
+            content: 'Only the server owner can use ranking commands.',
+            ephemeral: true
+          });
+        }
+
+        if (!EASYPOS_RANKING_TOKEN || !EASYPOS_RANKING_MOD_ID) {
+          return interaction.reply({
+            content: '⚠️ Ranking is not configured on this bot. (EASYPOS_RANKING_TOKEN or EASYPOS_RANKING_MOD_ID missing)',
+            ephemeral: true
+          });
+        }
+
+        const sub = interaction.options.getSubcommand();
+        const username = interaction.options.getString('username', true);
+
+        await interaction.deferReply({ ephemeral: true }); // keep rank actions private
+
+        try {
+          // Resolve Roblox username → userId
+          const userId = await robloxUsernameToId(username);
+          if (!userId) {
+            return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
+          }
+
+          const info = await robloxUserInfo(userId);
+          const display = info.displayName ?? info.name ?? username;
+
+          if (sub === 'promote') {
+            const scaleCode = interaction.options.getString('scalecode') || undefined;
+
+            const result = await fetchEasyPosPromote(
+              userId,
+              Number(EASYPOS_RANKING_MOD_ID),
+              scaleCode
+            );
+
+            if (!result || result.success === false) {
+              const reason = result?.error || 'Unknown error from easyPOS.';
+              return interaction.editReply(
+                `❌ Could not promote **${display}**.\nReason: \`${reason}\``
+              );
+            }
+
+            const newRank = result.data?.rank || 'updated rank';
+
+            const embed = new EmbedBuilder()
+              .setTitle('📈 Promotion successful')
+              .setColor(0x38a34a)
+              .setDescription(
+                [
+                  `User: **${display}** (ID: \`${userId}\`)`,
+                  `New rank: **${newRank}**`,
+                  '',
+                  `Handled via easyPOS ranking for CityMart.`
+                ].join('\n')
+              )
+              .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
+          }
+
+          if (sub === 'demote') {
+            const result = await fetchEasyPosDemote(
+              userId,
+              Number(EASYPOS_RANKING_MOD_ID)
+            );
+
+            if (!result || result.success === false) {
+              const reason = result?.error || 'Unknown error from easyPOS.';
+              return interaction.editReply(
+                `❌ Could not demote **${display}**.\nReason: \`${reason}\``
+              );
+            }
+
+            const newRank = result.data?.rank || 'updated rank';
+
+            const embed = new EmbedBuilder()
+              .setTitle('📉 Demotion successful')
+              .setColor(0xd9534f)
+              .setDescription(
+                [
+                  `User: **${display}** (ID: \`${userId}\`)`,
+                  `New rank: **${newRank}**`,
+                  '',
+                  `Handled via easyPOS ranking for CityMart.`
+                ].join('\n')
+              )
+              .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
+          }
+
+          // Just in case a subcommand slips through
+          return interaction.editReply('Unknown /ranking subcommand.');
+        } catch (err) {
+          console.error('ranking/easyPOS error:', err);
+          return interaction.editReply('❌ Something went wrong while processing that ranking action. Try again later.');
         }
       }
 

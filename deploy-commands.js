@@ -61,7 +61,7 @@ const commands = [
         .setMaxLength(1000)
     )),
 
-  // Roblox user lookup (with CityMart role)
+  // Roblox user lookup
   noDM(new SlashCommandBuilder()
     .setName('memberlookup')
     .setDescription('Look up a Roblox user and show their CityMart Group role')
@@ -85,10 +85,10 @@ const commands = [
         .setMaxLength(20)
     )),
 
-  // Donations lookup via easyPOS
+  // Donations: single user
   noDM(new SlashCommandBuilder()
     .setName('donations')
-    .setDescription('Show total donations for a Roblox user')
+    .setDescription("Show how much a user has donated (easyPOS)")
     .addStringOption(opt =>
       opt
         .setName('username')
@@ -97,17 +97,17 @@ const commands = [
         .setMaxLength(20)
     )),
 
-  // Donations leaderboard via easyPOS
+  // Donations: leaderboard
   noDM(new SlashCommandBuilder()
     .setName('donationsleaderboard')
-    .setDescription('Show the top donations')),
+    .setDescription('Show the top donations leaderboard (easyPOS)')),
 
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
     .setName('communitycount')
     .setDescription('Show the current CityMart Roblox Community member count')),
 
-  // CityMart giveaways (owner-only logic is in handler)
+  // CityMart giveaways
   noDM(new SlashCommandBuilder()
     .setName('giveaway')
     .setDescription('Manage CityMart giveaways')
@@ -124,7 +124,7 @@ const commands = [
         .addStringOption(opt =>
           opt
             .setName('end')
-            .setDescription('End date & time (YYYY-MM-DD HH:mm UTC)')
+            .setDescription('End date & time (YYYY-MM-DD HH:mm)')
             .setRequired(true)
         )
     )
@@ -177,10 +177,44 @@ const commands = [
             .setDescription('User to remove from the giveaway')
             .setRequired(true)
         )
+    )),
+
+  // Ranking (owner-only logic in handler)
+  noDM(new SlashCommandBuilder()
+    .setName('ranking')
+    .setDescription('Promote or demote Roblox users via easyPOS ranking (owner only)')
+    .addSubcommand(sub =>
+      sub
+        .setName('promote')
+        .setDescription('Promote a Roblox user')
+        .addStringOption(opt =>
+          opt
+            .setName('username')
+            .setDescription('Roblox username to promote')
+            .setRequired(true)
+            .setMaxLength(20)
+        )
+        .addStringOption(opt =>
+          opt
+            .setName('scalecode')
+            .setDescription('Scale code (only required if on minimum rank)')
+            .setRequired(false)
+        )
+    )
+    .addSubcommand(sub =>
+      sub
+        .setName('demote')
+        .setDescription('Demote a Roblox user')
+        .addStringOption(opt =>
+          opt
+            .setName('username')
+            .setDescription('Roblox username to demote')
+            .setRequired(true)
+            .setMaxLength(20)
+        )
     ))
 ].map(c => c.toJSON());
 
-// Set up REST client
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 // Deploy commands with timestamped logging
