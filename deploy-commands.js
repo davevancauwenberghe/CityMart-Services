@@ -85,6 +85,23 @@ const commands = [
         .setMaxLength(20)
     )),
 
+  // Donations lookup via easyPOS
+  noDM(new SlashCommandBuilder()
+    .setName('donations')
+    .setDescription('Show total donations for a Roblox user')
+    .addStringOption(opt =>
+      opt
+        .setName('username')
+        .setDescription('Roblox username to look up')
+        .setRequired(true)
+        .setMaxLength(20)
+    )),
+
+  // Donations leaderboard via easyPOS
+  noDM(new SlashCommandBuilder()
+    .setName('donationsleaderboard')
+    .setDescription('Show the top donations for this key')),
+
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
     .setName('communitycount')
