@@ -515,9 +515,10 @@ async function fetchEasyPosActivity(userId) {
 }
 
 // ---------------------- easyPOS Donation helpers ----------------------
-
 async function fetchEasyPosDonations(userId) {
-  if (!EASYPOS_DONATIONS_TOKEN) throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+  if (!EASYPOS_DONATIONS_TOKEN) {
+    throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+  }
 
   const res = await fetch(`${EASYPOS_BASE_URL}/donations/lookup`, {
     method: 'POST',
@@ -537,16 +538,14 @@ async function fetchEasyPosDonations(userId) {
   }
 
   const body = await res.json();
-  if (!body.success) {
-    throw new Error(`easyPOS donations API error: ${body.error || 'unknown error'}`);
-  }
-
-  // body.data = { userId, amount }
-  return body.data || null;
+  // Shape: { success: boolean, error?: string, data?: { userId, amount } }
+  return body;
 }
 
 async function fetchEasyPosDonationsLeaderboard() {
-  if (!EASYPOS_DONATIONS_TOKEN) throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+  if (!EASYPOS_DONATIONS_TOKEN) {
+    throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+  }
 
   const res = await fetch(`${EASYPOS_BASE_URL}/donations/leaderboard`, {
     method: 'POST',
@@ -565,14 +564,8 @@ async function fetchEasyPosDonationsLeaderboard() {
   }
 
   const body = await res.json();
-  if (!body.success) {
-    throw new Error(`easyPOS donations leaderboard API error: ${body.error || 'unknown error'}`);
-  }
-
-  // body.data.donations = [{ userId, amount }, ...]
-  return (body.data && Array.isArray(body.data.donations))
-    ? body.data.donations
-    : [];
+  // Shape: { success: boolean, error?: string, data?: { donations: [...] } }
+  return body;
 }
 
 // ---------------------- Triggers ----------------------
@@ -1136,7 +1129,7 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
-      // easyPOS donations
+      // easyPOS donations — single user
       case 'donations': {
         const username = interaction.options.getString('username', true);
 
@@ -1150,14 +1143,16 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply(); // public
 
         try {
+          // 1) Resolve username -> Roblox userId
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
           }
 
+          // 2) Fetch Roblox info + easyPOS donations in parallel
           const [info, donations] = await Promise.all([
             robloxUserInfo(userId),
-            fetchEasyPosDonations(userId)
+            fetchEasyPosDonations(userId) // should return { success, error?, data? }
           ]);
 
           if (!donations || donations.success === false || !donations.data) {
@@ -1175,9 +1170,7 @@ client.on('interactionCreate', async interaction => {
             .setURL(`https://www.roblox.com/users/${info.id}/profile`)
             .setThumbnail(THUMBNAIL_URL)
             .setColor(0xffc107)
-            .setDescription(
-              `Total donated: **${amount.toLocaleString()}**`
-            )
+            .setDescription(`Total donated: **${amount.toLocaleString()}**`)
             .setFooter({ text: 'Donations data provided by easyPOS' })
             .setTimestamp();
 
@@ -1200,7 +1193,8 @@ client.on('interactionCreate', async interaction => {
         await interaction.deferReply(); // public
 
         try {
-          const leaderboard = await fetchEasyPosDonationsLeaderboard();
+          const leaderboard = await fetchEasyPosDonationsLeaderboard(); 
+          // expected: { success, error?, data?: { donations: [...] } }
 
           if (!leaderboard || leaderboard.success === false || !leaderboard.data) {
             const errText = leaderboard?.error || 'Unknown error from easyPOS.';
@@ -1219,17 +1213,18 @@ client.on('interactionCreate', async interaction => {
 
           // Resolve Roblox display names for each userId
           const resolved = await Promise.all(entries.map(async (entry) => {
+            const numericId = Number(entry.userId);
             try {
-              const info = await robloxUserInfo(Number(entry.userId));
+              const info = await robloxUserInfo(numericId);
               return {
-                userId: entry.userId,
+                userId: numericId,
                 amount: entry.amount,
                 name: info.displayName ?? info.name,
                 username: info.name
               };
             } catch {
               return {
-                userId: entry.userId,
+                userId: numericId,
                 amount: entry.amount,
                 name: `User ${entry.userId}`,
                 username: null

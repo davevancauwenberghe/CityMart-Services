@@ -100,7 +100,7 @@ const commands = [
   // Donations leaderboard via easyPOS
   noDM(new SlashCommandBuilder()
     .setName('donationsleaderboard')
-    .setDescription('Show the top donations for this key')),
+    .setDescription('Show the top donations')),
 
   // Current Roblox community member count
   noDM(new SlashCommandBuilder()
