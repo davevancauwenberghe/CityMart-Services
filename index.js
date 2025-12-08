@@ -514,6 +514,67 @@ async function fetchEasyPosActivity(userId) {
   return data; // { success, error?, data? }
 }
 
+// ---------------------- easyPOS Donation helpers ----------------------
+
+async function fetchEasyPosDonations(userId) {
+  if (!EASYPOS_DONATIONS_TOKEN) throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+
+  const res = await fetch(`${EASYPOS_BASE_URL}/donations/lookup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify({
+      token: EASYPOS_DONATIONS_TOKEN,
+      userId: Number(userId)
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`easyPOS donations HTTP ${res.status}: ${text}`);
+  }
+
+  const body = await res.json();
+  if (!body.success) {
+    throw new Error(`easyPOS donations API error: ${body.error || 'unknown error'}`);
+  }
+
+  // body.data = { userId, amount }
+  return body.data || null;
+}
+
+async function fetchEasyPosDonationsLeaderboard() {
+  if (!EASYPOS_DONATIONS_TOKEN) throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
+
+  const res = await fetch(`${EASYPOS_BASE_URL}/donations/leaderboard`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify({
+      token: EASYPOS_DONATIONS_TOKEN
+    })
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`easyPOS donations leaderboard HTTP ${res.status}: ${text}`);
+  }
+
+  const body = await res.json();
+  if (!body.success) {
+    throw new Error(`easyPOS donations leaderboard API error: ${body.error || 'unknown error'}`);
+  }
+
+  // body.data.donations = [{ userId, amount }, ...]
+  return (body.data && Array.isArray(body.data.donations))
+    ? body.data.donations
+    : [];
+}
+
 // ---------------------- Triggers ----------------------
 const TRIGGERS = [
   {
