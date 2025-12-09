@@ -200,14 +200,47 @@ async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
           components: [] // remove the enter button
         });
 
+        // 🔔 Fancy announcement embed
         if (giveaway.winnerId) {
-          await channel.send(
-            reroll
-              ? `🎲 New winner for **${giveaway.prize}**: <@${giveaway.winnerId}>!`
-              : `🎉 Congratulations <@${giveaway.winnerId}>! You won **${giveaway.prize}**!`
-          );
+          const winnerEmbed = new EmbedBuilder()
+            .setColor(reroll ? 0xffc107 : 0x00ff88)
+            .setTitle(reroll ? '🎲 New Giveaway Winner!' : '🎉 Giveaway Winner!')
+            .setThumbnail(THUMBNAIL_URL)
+            .setDescription(
+              [
+                `Prize: **${giveaway.prize}**`,
+                `Winner: <@${giveaway.winnerId}>`,
+                `Entries: **${giveaway.entrants.length}**`,
+                '',
+                reroll
+                  ? 'A new winner has been selected for this giveaway.'
+                  : 'Thank you to everyone who entered!'
+              ].join('\n')
+            )
+            .setFooter({
+              text: giveaway.createdBy
+                ? `Hosted by ${msg.guild?.members?.cache.get(giveaway.createdBy)?.user?.tag || 'CityMart Staff'}`
+                : 'CityMart Giveaway'
+            })
+            .setTimestamp();
+
+          await channel.send({ embeds: [winnerEmbed] });
         } else if (!reroll) {
-          await channel.send('No winner could be chosen for this giveaway.');
+          const noWinnerEmbed = new EmbedBuilder()
+            .setColor(0xd9534f)
+            .setTitle('😔 No Winner Selected')
+            .setThumbnail(THUMBNAIL_URL)
+            .setDescription(
+              [
+                `Prize: **${giveaway.prize}**`,
+                '',
+                'No valid entries were found for this giveaway.',
+                'Better luck next time!'
+              ].join('\n')
+            )
+            .setTimestamp();
+
+          await channel.send({ embeds: [noWinnerEmbed] });
         }
       }
     }
