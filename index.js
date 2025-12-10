@@ -1125,12 +1125,15 @@ client.on('messageCreate', async message => {
             )
           ].join(' ');
 
+          // Matches the title we use in the giveaway winner DM embed
           if (combined.includes('You won a CityMart Giveaway!')) {
             isGiveawayWinnerFollowup = true;
           }
         }
       }
-    } catch {}
+    } catch {
+      // If history fetch fails, we just fall back to the generic support reply
+    }
 
     const title = isGiveawayWinnerFollowup
       ? '🎉 You Won a CityMart Giveaway!'
@@ -1140,14 +1143,14 @@ client.on('messageCreate', async message => {
       ? [
           `Hey ${message.author}, congrats again on your win! 🥳`,
           '',
-          'To keep everything organised, please claim your prize through the **support channel** in the CityMart server.',
+          'To keep everything organised, please claim your prize through a **support ticket** in the CityMart server.',
           'A staff member will assist you there. 🛠️'
         ].join('\n')
       : [
           `Hey ${message.author}, thanks for your message! ✨`,
           '',
           'I don’t handle support directly in DMs.',
-          'Please head to our **support channel** in the CityMart server so a staff member can help you.'
+          'Please open a **support ticket** in the CityMart server so a staff member can assist you. 🛠️'
         ].join('\n');
 
     const embed = new EmbedBuilder()
@@ -1165,9 +1168,10 @@ client.on('messageCreate', async message => {
               new ButtonBuilder()
                 .setLabel(
                   isGiveawayWinnerFollowup
-                    ? '🎟 Claim Prize via Support'
-                    : '❓ Open Support Channel'
+                    ? 'Claim Prize via Support'
+                    : 'Open Support Channel'
                 )
+                .setEmoji('❓')
                 .setStyle(ButtonStyle.Link)
                 .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
             )
