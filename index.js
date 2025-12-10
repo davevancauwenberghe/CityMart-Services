@@ -7,7 +7,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ActivityType
+  ActivityType,
+  Partials
 } = require('discord.js');
 const http = require('http');
 const fs   = require('fs');
@@ -200,9 +201,9 @@ async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
           components: [] // remove the enter button
         });
 
-        // 🔔 Fancy announcement embed
+        // 🔔 Public announcement embed
         if (giveaway.winnerId) {
-          const winnerEmbed = new EmbedBuilder()
+          const publicEmbed = new EmbedBuilder()
             .setColor(reroll ? 0xffc107 : 0x00ff88)
             .setTitle(reroll ? '🎲 New Giveaway Winner!' : '🎉 Giveaway Winner!')
             .setThumbnail(THUMBNAIL_URL)
@@ -224,11 +225,44 @@ async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
             })
             .setTimestamp();
 
-          await channel.send({ embeds: [winnerEmbed] });
-        } else if (!reroll) {
+          await channel.send({ embeds: [publicEmbed] });
+
+          // 📩 DM the winner (may fail if DMs are closed – we ignore that)
+          try {
+            const user =
+              msg.guild?.members?.cache.get(giveaway.winnerId)?.user ||
+              await client.users.fetch(giveaway.winnerId).catch(() => null);
+
+            if (user) {
+              const dmEmbed = new EmbedBuilder()
+                .setColor(0x00ff88)
+                .setTitle('🎉 You won a CityMart Giveaway!')
+                .setThumbnail(THUMBNAIL_URL)
+                .setDescription(
+                  [
+                    `Prize: **${giveaway.prize}**`,
+                    '',
+                    'You were drawn as the winner in a CityMart giveaway.',
+                    'Please open a support ticket in the CityMart server to claim your prize.'
+                  ].join('\n')
+                )
+                .setFooter({ text: 'CityMart Services' })
+                .setTimestamp();
+
+              const components =
+                SUPPORT_CHANNEL_ID && GUILD_ID
+                  ? [createSupportRow()]
+                  : [];
+
+              await user.send({ embeds: [dmEmbed], components }).catch(() => {});
+            }
+          } catch (dmErr) {
+            console.error('Failed to DM giveaway winner:', dmErr);
+          }
+                } else {
           const noWinnerEmbed = new EmbedBuilder()
             .setColor(0xd9534f)
-            .setTitle('😔 No Winner Selected')
+            .setTitle(reroll ? '😔 No New Winner Selected' : '😔 No Winner Selected')
             .setThumbnail(THUMBNAIL_URL)
             .setDescription(
               [
@@ -370,8 +404,10 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages
+  ],
+  partials: [Partials.Channel]
 });
 
 // ---------------------- Constants ----------------------
@@ -1058,6 +1094,34 @@ client.on('messageCreate', async message => {
     await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
   } catch (err) {
     console.error('Error in messageCreate:', err);
+  }
+});
+
+// ---------------------- Direct Messages handler ----------------------
+client.on('messageCreate', async message => {
+  try {
+    // Only handle DMs from humans
+    if (message.author.bot) return;
+    if (message.guild) return; // ignore server messages here, handled above
+
+    // Simple auto-response for DMs
+    const supportUrl =
+      (GUILD_ID && SUPPORT_CHANNEL_ID)
+        ? `https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`
+        : null;
+
+    const lines = [
+      `Hey ${message.author}, thanks for reaching out!`,
+      '',
+      'I don’t handle support directly in DMs.',
+      supportUrl
+        ? `🛠️ Please open a ticket or ask your question in our support channel:\n${supportUrl}`
+        : '🛠️ Please reach out in the CityMart support channel in the server.'
+    ];
+
+    await message.reply(lines.join('\n'));
+  } catch (err) {
+    console.error('Error handling DM message:', err);
   }
 });
 
