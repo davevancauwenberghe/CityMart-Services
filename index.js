@@ -977,7 +977,7 @@ client.once('ready', async () => {
 // ---------------------- Mention-based keywords ----------------------
 client.on('messageCreate', async message => {
   try {
-    if (message.author.bot || !message.guild) return;
+    if (message.author.bot) return;
 
     // Generic cooldown
     const now  = Date.now();
@@ -1097,29 +1097,84 @@ client.on('messageCreate', async message => {
   }
 });
 
-// ---------------------- Direct Messages handler ----------------------
+// ---------------------- DM Handler (Giveaway Winner Support Redirect) ----------------------
 client.on('messageCreate', async message => {
   try {
-    // Only handle DMs from humans
-    if (message.author.bot) return;
-    if (message.guild) return; // ignore server messages here, handled above
+    // Ignore bot messages and guild messages — this is DM-only logic
+    if (message.author.bot || message.guild) return;
 
-    // Simple auto-response for DMs
-    const supportUrl =
-      (GUILD_ID && SUPPORT_CHANNEL_ID)
-        ? `https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`
-        : null;
+    const dmChannel = message.channel;
 
-    const lines = [
-      `Hey ${message.author}, thanks for reaching out!`,
-      '',
-      'I don’t handle support directly in DMs.',
-      supportUrl
-        ? `🛠️ Please open a ticket or ask your question in our support channel:\n${supportUrl}`
-        : '🛠️ Please reach out in the CityMart support channel in the server.'
-    ];
+    // Try to detect if user previously received a giveaway-winner DM
+    let isGiveawayWinnerFollowup = false;
 
-    await message.reply(lines.join('\n'));
+    try {
+      const history = await dmChannel.messages.fetch({ limit: 10 }).catch(() => null);
+      
+      if (history) {
+        const lastBotMsg = history
+          .filter(m => m.author.id === client.user.id && m.id !== message.id)
+          .sort((a, b) => b.createdTimestamp - a.createdTimestamp)
+          .first();
+
+        if (lastBotMsg) {
+          const combined = [
+            lastBotMsg.content || '',
+            ...(lastBotMsg.embeds || []).map(e =>
+              `${e.title || ''} ${e.description || ''}`
+            )
+          ].join(' ');
+
+          if (combined.includes('You won a CityMart Giveaway!')) {
+            isGiveawayWinnerFollowup = true;
+          }
+        }
+      }
+    } catch {}
+
+    const title = isGiveawayWinnerFollowup
+      ? '🎉 You Won a CityMart Giveaway!'
+      : '📩 Need Help?';
+
+    const description = isGiveawayWinnerFollowup
+      ? [
+          `Hey ${message.author}, congrats again on your win! 🥳`,
+          '',
+          'To keep everything organised, please claim your prize through the **support channel** in the CityMart server.',
+          'A staff member will assist you there. 🛠️'
+        ].join('\n')
+      : [
+          `Hey ${message.author}, thanks for your message! ✨`,
+          '',
+          'I don’t handle support directly in DMs.',
+          'Please head to our **support channel** in the CityMart server so a staff member can help you.'
+        ].join('\n');
+
+    const embed = new EmbedBuilder()
+      .setColor(isGiveawayWinnerFollowup ? 0x00ff88 : 0x3498db)
+      .setTitle(title)
+      .setDescription(description)
+      .setThumbnail(THUMBNAIL_URL)
+      .setFooter({ text: 'CityMart Services Support' })
+      .setTimestamp();
+
+    const components =
+      SUPPORT_CHANNEL_ID && GUILD_ID
+        ? [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setLabel(
+                  isGiveawayWinnerFollowup
+                    ? '🎟 Claim Prize via Support'
+                    : '❓ Open Support Channel'
+                )
+                .setStyle(ButtonStyle.Link)
+                .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
+            )
+          ]
+        : [];
+
+    await message.reply({ embeds: [embed], components });
   } catch (err) {
     console.error('Error handling DM message:', err);
   }
