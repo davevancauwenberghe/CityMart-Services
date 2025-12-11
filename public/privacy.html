@@ -8,67 +8,47 @@
   <link rel="icon" href="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
   <title>Privacy Policy - CityMart Services</title>
-  <style>
-    .page-fade { opacity: 0; transform: translateY(10px); animation: pageFade 500ms ease-out forwards; }
-    @keyframes pageFade { to { opacity: 1; transform: translateY(0); } }
-
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 0.6rem 1rem; border-radius: 12px; border: none; cursor: pointer;
-      text-decoration: none; font-weight: 600; line-height: 1;
-      color: #fff; background: rgba(255,255,255,0.12);
-      transition: filter .2s ease, background .2s ease;
-      opacity: 0; transform: scale(0.95);
-      animation: fadeInBtn 400ms ease-out 300ms forwards;
-    }
-    .btn:hover { filter: brightness(1.1); }
-
-    @keyframes fadeInBtn {
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .btn-row { margin-top: 2rem; display: flex; justify-content: center; }
-    .content-narrow { text-align: left; margin: 0 auto; max-width: 36ch; }
-    #container h1 { text-align: center; margin-bottom: .5rem; }
-    #container p.lead { text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; }
-    #container ul { margin-left: 1.25rem; }
-    #container h2 { margin-top: 1.25rem; margin-bottom: .25rem; font-size: 1.1rem; }
-  </style>
 </head>
 <body>
   <div id="particles-js"></div>
 
-  <div class="wrapper page-fade">
-    <div id="container">
-      <h1>Privacy Policy</h1>
-      <p class="lead">Last updated: August 2025</p>
+  <main class="page-main">
+    <div class="wrapper page-fade legal-layout">
+      <div id="container">
+        <div class="legal-header">
+          <h1>Privacy Policy</h1>
+          <p class="legal-lead">Last updated: August 2025</p>
+        </div>
 
-      <div class="content-narrow">
-        <p>
-          CityMart Services operates as a Discord bot for the CityMart Group and may interact with external services
-          to provide features.
-        </p>
+        <div class="legal-content">
+          <p>
+            CityMart Services operates as a Discord bot for the CityMart Group and may interact with external services
+            to provide features.
+          </p>
 
-        <h2>Data Handling</h2>
-        <ul>
-          <li>No personal data is permanently stored by the bot.</li>
-          <li>Messages sent to the bot are processed in-memory and may be relayed to third-party APIs for generating responses.</li>
-          <li>hallAI requests are processed via the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>, using a Cloudflare Worker as a proxy.</li>
-          <li>Discord messages and commands are processed using the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
-        </ul>
+          <h2>Data Handling</h2>
+          <ul>
+            <li>No personal data is permanently stored by the bot.</li>
+            <li>Messages sent to the bot are processed in-memory and may be relayed to third-party APIs for generating responses.</li>
+            <li>hallAI requests are processed via the <a href="https://openai.com/policies/privacy-policy" target="_blank" rel="noopener noreferrer">OpenAI API</a>, using a Cloudflare Worker as a proxy.</li>
+            <li>Discord messages and commands are processed using the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord API</a>.</li>
+          </ul>
 
-        <h2>Your Rights</h2>
-        <p>
-          If you wish to have all conversation data associated with your session removed, please contact the server administrator
-          or use any provided in-bot command for data deletion (if available).
-        </p>
-      </div>
+          <h2>Your Rights</h2>
+          <p>
+            If you wish to have all conversation data associated with your session removed, please contact the server administrator
+            or use any provided in-bot command for data deletion (if available).
+          </p>
+        </div>
 
-      <div class="btn-row">
-        <button class="btn back-btn" id="history-back">Back</button>
+        <div class="btn-row legal-actions">
+          <a class="btn" href="index.html">Home</a>
+          <button class="btn back-btn" id="history-back">Back</button>
+          <a class="btn" href="tos.html">Terms of Service</a>
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
   <script>
