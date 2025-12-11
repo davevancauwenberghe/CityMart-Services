@@ -8,63 +8,43 @@
   <link rel="icon" href="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
   <title>Terms of Service - CityMart Services</title>
-  <style>
-    .page-fade { opacity: 0; transform: translateY(10px); animation: pageFade 500ms ease-out forwards; }
-    @keyframes pageFade { to { opacity: 1; transform: translateY(0); } }
-
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      padding: 0.6rem 1rem; border-radius: 12px; border: none; cursor: pointer;
-      text-decoration: none; font-weight: 600; line-height: 1;
-      color: #fff; background: rgba(255,255,255,0.12);
-      transition: filter .2s ease, background .2s ease;
-      opacity: 0; transform: scale(0.95);
-      animation: fadeInBtn 400ms ease-out 300ms forwards;
-    }
-    .btn:hover { filter: brightness(1.1); }
-
-    @keyframes fadeInBtn {
-      to { opacity: 1; transform: scale(1); }
-    }
-
-    .btn-row { margin-top: 2rem; display: flex; justify-content: center; }
-    .content-narrow { text-align: left; margin: 0 auto; max-width: 36ch; }
-    #container h1 { text-align: center; margin-bottom: .5rem; }
-    #container p.lead { text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; }
-    #container ul { margin-left: 1.25rem; }
-    #container h2 { margin-top: 1.25rem; margin-bottom: .25rem; font-size: 1.1rem; }
-  </style>
 </head>
 <body>
   <div id="particles-js"></div>
 
-  <div class="wrapper page-fade">
-    <div id="container">
-      <h1>Terms of Service</h1>
-      <p class="lead">Last updated: August 2025</p>
+  <main class="page-main">
+    <div class="wrapper page-fade legal-layout">
+      <div id="container">
+        <div class="legal-header">
+          <h1>Terms of Service</h1>
+          <p class="legal-lead">Last updated: August 2025</p>
+        </div>
 
-      <div class="content-narrow">
-        <h2>1. Acceptance of Terms</h2>
-        <p>By using CityMart Services (the Discord bot), you agree to these Terms of Service. If you do not agree, please do not use the bot.</p>
+        <div class="legal-content">
+          <h2>1. Acceptance of Terms</h2>
+          <p>By using CityMart Services (the Discord bot), you agree to these Terms of Service. If you do not agree, please do not use the bot.</p>
 
-        <h2>2. Intended Use</h2>
-        <ul>
-          <li>The bot is designed to assist members of the CityMart Group.</li>
-          <li>Users must comply with Discord’s <a href="https://discord.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and <a href="https://discord.com/guidelines" target="_blank" rel="noopener noreferrer">Community Guidelines</a>.</li>
-        </ul>
+          <h2>2. Intended Use</h2>
+          <ul>
+            <li>The bot is designed to assist members of the CityMart Group.</li>
+            <li>Users must comply with Discord’s <a href="https://discord.com/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a> and <a href="https://discord.com/guidelines" target="_blank" rel="noopener noreferrer">Community Guidelines</a>.</li>
+          </ul>
 
-        <h2>3. Liability</h2>
-        <p>The bot is provided “as-is” without warranty of any kind. The developers are not responsible for any damages arising from use of the bot.</p>
+          <h2>3. Liability</h2>
+          <p>The bot is provided “as-is” without warranty of any kind. The developers are not responsible for any damages arising from use of the bot.</p>
 
-        <h2>4. Changes</h2>
-        <p>These Terms of Service may be updated at any time. Continued use of the bot after changes indicates acceptance of the updated terms.</p>
-      </div>
+          <h2>4. Changes</h2>
+          <p>These Terms of Service may be updated at any time. Continued use of the bot after changes indicates acceptance of the updated terms.</p>
+        </div>
 
-      <div class="btn-row">
-        <button class="btn back-btn" id="history-back">Back</button>
+        <div class="btn-row legal-actions">
+          <a class="btn" href="index.html">Home</a>
+          <button class="btn back-btn" id="history-back">Back</button>
+          <a class="btn" href="privacy.html">Privacy Policy</a>
+        </div>
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
   <script>
