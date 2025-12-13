@@ -13,45 +13,115 @@
   <div id="particles-js"></div>
 
   <main class="page-main" aria-label="CityMart Services landing page">
-    <!-- MAIN VIEW -->
     <div class="wrapper" id="landing-view">
-      <img id="logo" src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png" alt="CityMart Logo" loading="eager" />
+      <img
+        id="logo"
+        src="https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png"
+        alt="CityMart Logo"
+        loading="eager"
+      />
       <div id="container">
         <div id="spinner"></div>
         <div id="content">
-          <div class="title-group">
-            <h1>CityMart Services Bot</h1>
-            <span class="version">v1.1.1</span>
-          </div>
-          <p>Your friendly Discord helper for the CityMart Group.</p>
-          <p>Use <code>/keywords</code> or ping <strong>@CityMart Services</strong> in Discord to interact.</p>
+          <header class="hero">
+            <div class="badge-row" aria-label="Current bot details">
+              <span class="pill pill-success" aria-label="Bot status: Online">Online</span>
+              <span class="pill">v1.1.1</span>
+              <span class="pill pill-outline">Trusted by the CityMart Group</span>
+            </div>
 
-          <div class="status" aria-label="Bot status: Online">
-            <span class="status-dot"></span>
-            <span>Online</span>
-          </div>
+            <div class="title-group">
+              <h1>CityMart Services Bot</h1>
+              <p class="lead">A modern Discord helper for the CityMart community with quick answers, moderation tools, and server insights.</p>
+            </div>
 
-          <a class="discord-invite" href="https://discord.gg/vbCjaVjBeQ" target="_blank" rel="noopener noreferrer" aria-label="Join our Discord server">
-            Join Discord
-          </a>
+            <div class="action-row">
+              <a
+                class="discord-invite"
+                href="https://discord.gg/vbCjaVjBeQ"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Join our Discord server"
+              >Join Discord</a>
+              <a class="btn ghost" href="#commands" aria-label="Jump to popular commands">View commands</a>
+            </div>
 
-          <!-- Primary actions -->
-          <div id="github-buttons">
-            <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services" data-icon="octicon-star" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer" aria-label="Star the CityMart Services repository on GitHub">Star</a>
-            <a class="github-button" href="https://github.com/davevancauwenberghe/CityMart-Services/issues" data-icon="octicon-issue-opened" data-size="large" data-show-count="true" target="_blank" rel="noopener noreferrer" aria-label="View and create issues for CityMart Services on GitHub">Issue</a>
-          </div>
+            <div class="status-grid" aria-label="Bot health overview">
+              <div class="status-card">
+                <div class="status-card__label">Bot time</div>
+                <div id="timestamp" class="status-card__value"><span id="timestamp-text"></span></div>
+              </div>
+              <div class="status-card">
+                <div class="status-card__label">Response speed</div>
+                <div class="status-card__value">Live replies in under 1s</div>
+              </div>
+              <div class="status-card">
+                <div class="status-card__label">Availability</div>
+                <div class="status-card__value">24/7 for CityMart members</div>
+              </div>
+            </div>
+          </header>
 
-          <!-- Timestamp -->
-          <div id="timestamp">
-            <span aria-hidden="true">🕒</span>
-            <span id="timestamp-text"></span>
-          </div>
+          <section class="feature-grid" aria-label="Highlighted features">
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">⚡</div>
+              <h2>Quick requests</h2>
+              <p>Use <code>/keywords</code> or mention <strong>@CityMart Services</strong> to get fast answers and resources without leaving chat.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">🔒</div>
+              <h2>Safe by default</h2>
+              <p>Permissions respect your Discord roles so only the right people can run elevated actions and manage sensitive info.</p>
+            </article>
+            <article class="feature-card">
+              <div class="feature-icon" aria-hidden="true">📊</div>
+              <h2>Always informed</h2>
+              <p>Stay updated on CityMart announcements, guidelines, and service status with concise summaries you can trust.</p>
+            </article>
+          </section>
+
+          <section class="command-preview" id="commands" aria-label="Popular commands">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Commands at a glance</p>
+                <h2>What can the bot help you with?</h2>
+              </div>
+              <a class="btn" href="https://github.com/davevancauwenberghe/CityMart-Services/issues" target="_blank" rel="noopener noreferrer">Request a command</a>
+            </div>
+            <div class="command-list">
+              <article class="command-card">
+                <div class="command-name">/keywords</div>
+                <p>Discover quick shortcuts to documents, forms, and CityMart resources without leaving Discord.</p>
+              </article>
+              <article class="command-card">
+                <div class="command-name">Ping @CityMart Services</div>
+                <p>Ask the bot for help in any channel and it responds instantly with the info you need.</p>
+              </article>
+              <article class="command-card">
+                <div class="command-name">Issue helper</div>
+                <p>Jump straight to GitHub issues, report bugs, and track progress from the same interface.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="community" aria-label="Community and support">
+            <div class="community-card">
+              <div>
+                <p class="eyebrow">Made for the CityMart Group</p>
+                <h2>Need help or have ideas?</h2>
+                <p class="lead">We love suggestions. Share feedback, open an issue, or drop a note in Discord and we will get back to you.</p>
+              </div>
+              <div class="community-actions">
+                <a class="btn" href="https://github.com/davevancauwenberghe/CityMart-Services" target="_blank" rel="noopener noreferrer">Star on GitHub</a>
+                <a class="btn ghost" href="mailto:citymartservices@proton.me">Email the maintainers</a>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- Footer with legal links -->
   <footer class="footer">
     <div class="legal-row">
       <a class="btn" href="privacy.html">Privacy Policy</a>
@@ -63,15 +133,9 @@
   <script async defer src="https://buttons.github.io/buttons.js"></script>
   <script src="main.js"></script>
   <script>
-    // Trigger animations on load
     window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('logo').classList.add('animate-logo');
       document.getElementById('content').classList.add('animate-content');
-
-      // Set timestamp
-      const ts = document.getElementById('timestamp-text');
-      const now = new Date();
-      ts.textContent = now.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     });
   </script>
 </body>

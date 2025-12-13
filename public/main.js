@@ -2,7 +2,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const spinner  = document.getElementById('spinner');
   const logo     = document.getElementById('logo');
   const content  = document.getElementById('content');
-  const tsTextEl = document.getElementById('timestamp-text'); // updated target
+  const tsTextEl = document.getElementById('timestamp-text');
 
   // Particles
   if (window.particlesJS) {
@@ -30,15 +30,31 @@ window.addEventListener('DOMContentLoaded', () => {
       hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false
     });
-    tsTextEl.textContent = `Bot time — ${brussels}`;
+    if (tsTextEl) {
+      tsTextEl.textContent = `Bot time — ${brussels}`;
+    }
   }
   updateTimestamp();
   setInterval(updateTimestamp, 1000);
 
   // Intro animation
   setTimeout(() => {
-    spinner.style.display = 'none';
-    logo.classList.add('animate-logo');
-    content.classList.add('animate-content');
-  }, 2000);
+    if (spinner) spinner.style.display = 'none';
+    if (logo) logo.classList.add('animate-logo');
+    if (content) content.classList.add('animate-content');
+  }, 900);
+
+  // Smooth scroll for in-page links
+  document.querySelectorAll('a[href^="#"]').forEach(link => {
+    link.addEventListener('click', event => {
+      const targetId = link.getAttribute('href');
+      if (targetId && targetId !== '#') {
+        const target = document.querySelector(targetId);
+        if (target) {
+          event.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    });
+  });
 });
