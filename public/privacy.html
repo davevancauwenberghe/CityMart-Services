@@ -43,7 +43,6 @@
 
         <div class="btn-row legal-actions">
           <a class="btn" href="index.html">Home</a>
-          <button class="btn back-btn" id="history-back">Back</button>
           <a class="btn" href="tos.html">Terms of Service</a>
         </div>
       </div>
@@ -67,9 +66,6 @@
         retina_detect: true
       });
     }
-    document.getElementById('history-back')?.addEventListener('click', () => {
-      if (history.length > 1) history.back(); else window.location.href = 'index.html';
-    });
   </script>
 </body>
 </html>
