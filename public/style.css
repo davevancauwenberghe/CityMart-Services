@@ -195,6 +195,47 @@ code {
 .command-name { font-weight: 800; color: var(--text-color); margin-bottom: .35rem; }
 .command-card p { margin: 0; }
 
+/* Policy section */
+.policy-showcase { margin: 2rem 0 1rem; text-align: left; }
+.policy-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.policy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .9rem; }
+.policy-card {
+  background: linear-gradient(140deg, rgba(56,163,74,0.18), rgba(255,255,255,0.04));
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+  display: grid;
+  gap: 0.4rem;
+}
+.policy-card h3 { margin: 0; color: var(--text-color); font-size: 1.1rem; }
+.policy-card p { margin: 0; color: var(--text-secondary); }
+.policy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: .3rem .75rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--card-border);
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  width: fit-content;
+}
+.card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c0e7c8;
+  text-decoration: none;
+  font-weight: 700;
+  margin-top: .35rem;
+}
+.card-link:hover { color: #fff; text-decoration: underline; }
+.card-links-inline { display: flex; gap: .75rem; flex-wrap: wrap; }
+
 /* Community */
 .community { margin-top: 2rem; }
 .community-card { background: linear-gradient(120deg, rgba(56,163,74,0.25), rgba(88,101,242,0.18)); border: 1px solid var(--card-border); border-radius: 18px; padding: 1.2rem 1.3rem; display: grid; gap: 0.9rem; box-shadow: 0 10px 36px rgba(0,0,0,0.3); }
