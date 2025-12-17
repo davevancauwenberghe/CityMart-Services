@@ -31,7 +31,7 @@ window.addEventListener('DOMContentLoaded', () => {
       hour12: false
     });
     if (tsTextEl) {
-      tsTextEl.textContent = `Bot time — ${brussels}`;
+      tsTextEl.textContent = `${brussels}`;
     }
   }
   updateTimestamp();

@@ -148,13 +148,50 @@ async function handleGiveawayEnterButton(interaction) {
     }
   }
 
-  if (!giveaway.entrants.includes(interaction.user.id)) {
-    giveaway.entrants.push(interaction.user.id);
-    saveGiveawaysToDisk();
-    return interaction.reply({ content: '🎉 You are now entered in this giveaway!', ephemeral: true });
-  } else {
-    return interaction.reply({ content: 'You are already entered in this giveaway.', ephemeral: true });
-  }
+if (!giveaway.entrants.includes(interaction.user.id)) {
+  giveaway.entrants.push(interaction.user.id);
+  saveGiveawaysToDisk();
+
+  const nowUnix = Math.floor(Date.now() / 1000);
+
+  const enteredEmbed = new EmbedBuilder()
+    .setColor(0x00ff88)
+    .setTitle('✅ Entry Confirmed')
+    .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+    .setDescription(
+      [
+        `You are now entered in **CityMart Giveaway**! 🎉`,
+        '',
+        `**Prize:** ${giveaway.prize}`,
+        `**Entered at:** <t:${nowUnix}:F>  •  <t:${nowUnix}:R>`,
+        '',
+        `**User:** ${interaction.user}`,
+        `**User ID:** \`${interaction.user.id}\``
+      ].join('\n')
+    )
+    .setFooter({ text: 'CityMart Services • Giveaway System' });
+
+  return interaction.reply({ embeds: [enteredEmbed], ephemeral: true });
+} else {
+  const alreadyUnix = Math.floor(Date.now() / 1000);
+
+  const alreadyEmbed = new EmbedBuilder()
+    .setColor(0xffc107)
+    .setTitle('ℹ️ Already Entered')
+    .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+    .setDescription(
+      [
+        `You’re already entered in this giveaway.`,
+        '',
+        `**Prize:** ${giveaway.prize}`,
+        `Checked at: <t:${alreadyUnix}:F>  •  <t:${alreadyUnix}:R>`,
+        '',
+        `**User ID:** \`${interaction.user.id}\``
+      ].join('\n')
+    )
+    .setFooter({ text: 'CityMart Services • Giveaway System' });
+
+  return interaction.reply({ embeds: [alreadyEmbed], ephemeral: true });
 }
 
 async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
