@@ -12,6 +12,7 @@ html, body { height: 100%; }
   --main-radius: 24px;
   --card-bg: rgba(255,255,255,0.04);
   --card-border: rgba(255,255,255,0.08);
+  --card-shadow: 0 10px 32px rgba(0,0,0,0.28);
 }
 
 /* Background particles */
@@ -133,6 +134,14 @@ code {
 }
 .pill-success { background: rgba(56,163,74,0.18); border-color: rgba(56,163,74,0.45); box-shadow: 0 0 0 1px rgba(56,163,74,0.25); }
 .pill-outline { background: transparent; border-color: rgba(255,255,255,0.25); color: var(--text-secondary); }
+.pill-status { font-weight: 700; letter-spacing: 0.02em; }
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #7ef29e, #38a34a 60%, #1f6b2d 100%);
+  box-shadow: 0 0 0 3px rgba(56,163,74,0.2);
+}
 
 /* Actions */
 .action-row { display: flex; flex-direction: column; gap: 0.65rem; justify-content: center; align-items: center; margin: 1.25rem 0 1.5rem; }
@@ -179,7 +188,7 @@ code {
   border-radius: 18px;
   padding: 1rem 1.1rem;
   text-align: left;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  box-shadow: var(--card-shadow);
 }
 .feature-card h2 { font-size: 1.1rem; margin: 0 0 .35rem; color: var(--text-color); }
 .feature-card p { margin: 0; color: var(--text-secondary); }
@@ -204,7 +213,7 @@ code {
   border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 1rem 1.1rem;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.28);
+  box-shadow: var(--card-shadow);
   display: grid;
   gap: 0.4rem;
 }
@@ -238,7 +247,7 @@ code {
 
 /* Community */
 .community { margin-top: 2rem; }
-.community-card { background: linear-gradient(120deg, rgba(56,163,74,0.25), rgba(88,101,242,0.18)); border: 1px solid var(--card-border); border-radius: 18px; padding: 1.2rem 1.3rem; display: grid; gap: 0.9rem; box-shadow: 0 10px 36px rgba(0,0,0,0.3); }
+.community-card { background: linear-gradient(120deg, rgba(56,163,74,0.25), rgba(88,101,242,0.18)); border: 1px solid var(--card-border); border-radius: 18px; padding: 1.2rem 1.3rem; display: grid; gap: 0.9rem; box-shadow: var(--card-shadow); }
 .community-actions { display: flex; flex-direction: column; gap: .6rem; }
 @media (min-width: 620px) { .community-card { grid-template-columns: 2fr 1fr; align-items: center; } .community-actions { align-items: flex-end; } }
 
@@ -260,16 +269,18 @@ code {
 .footer .legal-row { display: flex; justify-content: center; gap: .6rem; margin-top: .5rem; flex-wrap: wrap; }
 .footer .legal-row { position: relative; z-index: 2; }
 @media (max-width: 420px) { .footer .legal-row { flex-direction: column; align-items: stretch; } }
-.footer .btn { width: 100%; }
+.footer .btn { width: clamp(180px, 32vw, 220px); }
 
 /* Legal pages */
 .page-fade { opacity: 0; transform: translateY(10px); animation: pageFade 500ms ease-out forwards; }
 @keyframes pageFade { to { opacity: 1; transform: translateY(0); } }
 
-.legal-layout #container { padding-top: clamp(82px, 14vw, 116px); padding-bottom: 36px; }
+.legal-layout #container { margin-top: clamp(28px, 7vh, 56px); padding-top: clamp(58px, 12vw, 96px); padding-bottom: 36px; }
 .legal-header { text-align: center; margin-bottom: .75rem; }
 .legal-lead { text-align: center; color: var(--text-secondary); margin-bottom: 1.25rem; }
-.legal-content { text-align: left; margin: 0 auto; max-width: 540px; }
+.legal-content { text-align: left; margin: 0 auto; max-width: 640px; }
+.legal-content p { line-height: 1.7; }
+.legal-content li { margin: 0.5rem 0; line-height: 1.65; color: var(--text-secondary); }
 .legal-content ul { margin-left: 1.25rem; }
 .legal-content h2 { margin-top: 1.25rem; margin-bottom: .25rem; font-size: 1.1rem; }
 
@@ -277,6 +288,9 @@ code {
 
 @media (max-width: 520px) {
   .status-grid, .feature-grid, .command-list { gap: 0.7rem; }
+  .status-grid { grid-template-columns: 1fr; }
+  .policy-actions { width: 100%; }
+  .policy-actions .btn { width: 100%; }
   .community { margin-top: 1.6rem; }
   .community-card { padding: 1rem 1.05rem; }
 }
@@ -286,6 +300,14 @@ code {
   #container { margin-top: 32px; padding: clamp(18px, 3vw, 28px); }
   #content { padding-top: clamp(60px, 12vw, 90px); }
   .wrapper { width: min(96vw, 1100px); }
+}
+
+@media (min-width: 720px) {
+  .section-heading { flex-direction: row; align-items: center; }
+}
+
+@media (max-width: 520px) {
+  .footer .btn { width: 100%; }
 }
 
 /* Reduced motion accessibility */
