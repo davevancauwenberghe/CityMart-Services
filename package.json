@@ -1,14 +1,16 @@
 {
   "name": "citymart-bot",
-  "version": "1.0.9",
-  "description": "Discord bot for CityMart Group server",
+  "version": "1.2.1",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "test": "node --test"
   },
   "dependencies": {
-    "discord.js": "^13.17.1",
-    "dotenv": "^16.0.0"
+    "discord.js": "14.25.1",
+    "dotenv": "16.4.5"
+  },
+  "overrides": {
+    "undici": "^6.23.0"
   }
 }
