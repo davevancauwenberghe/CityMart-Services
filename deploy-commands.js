@@ -49,6 +49,10 @@ const commands = [
     .setName('lamp')
     .setDescription("Shh... the lamp doesn't exist")),
 
+  noDM(new SlashCommandBuilder()
+  .setName('citycraft')
+  .setDescription('CityCraft Minecraft server info + whitelist request')),
+
   // hallAI bridge
   noDM(new SlashCommandBuilder()
     .setName('ask')
