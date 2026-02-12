@@ -468,6 +468,10 @@ const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp','citym
 // Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
+// ---------------------- CityCraft ----------------------
+const CITYCRAFT_ADDRESS = 'citycraft.davevancauwenberghe.be';
+const CITYCRAFT_OWNER_USER_ID = '651525636351066182';
+
 // ---------------------- Small cache (5 min TTL) ----------------------
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map(); // key -> { value, expires }
@@ -750,6 +754,34 @@ async function fetchEasyPosDemote(userId, modId) {
   const body = await res.json();
   // body: { success, error?, data?: { rank? } }
   return body;
+}
+
+// ---------------------- CityCraft function ----------------------
+
+function buildCityCraftEmbed() {
+  const embed = new EmbedBuilder()
+    .setColor(0x57F287) // Discord green
+    .setTitle('🧱 CityCraft — Whitelisted Minecraft Server')
+    .setDescription(
+      [
+        `**Server Address:** \`${CITYCRAFT_ADDRESS}\``,
+        '',
+        'This server is **whitelisted**.',
+        'Click the button below to send your **Xbox Gamertag** or **Minecraft Java username** to Dave for approval.'
+      ].join('\n')
+    )
+    .setFooter({ text: 'CityMart Services • CityCraft' })
+    .setTimestamp();
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('citycraft_whitelist_request')
+      .setLabel('Request Whitelist Access')
+      .setStyle(ButtonStyle.Primary)
+      .setEmoji('📩')
+  );
+
+  return { embed, row };
 }
 
 // ---------------------- Triggers ----------------------
@@ -1314,6 +1346,12 @@ client.on('interactionCreate', async interaction => {
           return interaction.editReply('❌ Could not fetch the member count right now. Try again later.');
         }
       }
+
+      case 'citycraft': {
+        const { embed, row } = buildCityCraftEmbed();
+        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      }
+
 
       // easyPOS activity
       case 'activity': {
@@ -1989,6 +2027,96 @@ client.on('interactionCreate', async interaction => {
 
   } catch (err) {
     console.error('Button interaction error:', err);
+  }
+});
+
+// ---------------------- Button / Modal: CityCraft whitelist request ----------------------
+client.on('interactionCreate', async interaction => {
+  try {
+    // Button: open the modal
+    if (interaction.isButton() && interaction.customId === 'citycraft_whitelist_request') {
+      const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+
+      const modal = new ModalBuilder()
+        .setCustomId('citycraft_whitelist_modal')
+        .setTitle('CityCraft — Whitelist Request');
+
+      const usernameInput = new TextInputBuilder()
+        .setCustomId('citycraft_username')
+        .setLabel('Xbox Gamertag or Minecraft Java username')
+        .setStyle(TextInputStyle.Short)
+        .setMinLength(3)
+        .setMaxLength(32)
+        .setRequired(true)
+        .setPlaceholder('Example: Steve or SomeGamertag123');
+
+      const row = new ActionRowBuilder().addComponents(usernameInput);
+      modal.addComponents(row);
+
+      return interaction.showModal(modal);
+    }
+
+    // Modal submit: DM Dave
+    if (interaction.isModalSubmit() && interaction.customId === 'citycraft_whitelist_modal') {
+      const requestedName = interaction.fields.getTextInputValue('citycraft_username')?.trim();
+
+      if (!requestedName || requestedName.length < 3) {
+        return interaction.reply({
+          content: '❌ That username looks a bit too short. Please try again.',
+          ephemeral: true
+        });
+      }
+
+      // A nice “professional” DM embed for you
+      const requestEmbed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle('📥 CityCraft Whitelist Request')
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+        .addFields(
+          { name: 'Requested name', value: `\`${requestedName}\``, inline: false },
+          { name: 'Discord user', value: `${interaction.user.tag}`, inline: true },
+          { name: 'Discord user ID', value: `\`${interaction.user.id}\``, inline: true },
+          { name: 'When', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false }
+        )
+        .setFooter({ text: `Server: ${CITYCRAFT_ADDRESS}` })
+        .setTimestamp();
+
+      // DM Dave (you)
+      try {
+        const owner = await client.users.fetch(CITYCRAFT_OWNER_USER_ID);
+        await owner.send({ embeds: [requestEmbed] });
+      } catch (e) {
+        console.error('Failed to DM CityCraft whitelist request to owner:', e);
+        // Still tell the user we got it, but mention DM failure nicely.
+        return interaction.reply({
+          content:
+            '⚠️ I tried to forward your request, but I couldn’t DM the server owner. ' +
+            'Please contact staff in the server to request access.',
+          ephemeral: true
+        });
+      }
+
+      // Confirm to the user (ephemeral)
+      const confirmEmbed = new EmbedBuilder()
+        .setColor(0x57F287)
+        .setTitle('✅ Request sent!')
+        .setDescription(
+          [
+            `**Server Address:** \`${CITYCRAFT_ADDRESS}\``,
+            '',
+            `I sent your whitelist request: **${requestedName}**`,
+            'Dave will add you if approved.'
+          ].join('\n')
+        )
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [confirmEmbed], ephemeral: true });
+    }
+  } catch (err) {
+    console.error('CityCraft button/modal error:', err);
+    if (interaction.isRepliable()) {
+      return interaction.reply({ content: '❌ Something went wrong. Try again later.', ephemeral: true }).catch(() => {});
+    }
   }
 });
 
