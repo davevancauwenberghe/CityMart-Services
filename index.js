@@ -1,5 +1,6 @@
 // index.js
 require('dotenv').config();
+
 const {
   Client,
   GatewayIntentBits,
@@ -8,11 +9,24 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ActivityType,
-  Partials
+  Partials,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle
 } = require('discord.js');
+
 const http = require('http');
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
+
+// ---------------------- Process-level safety logging ----------------------
+process.on('unhandledRejection', err => {
+  console.error('Unhandled promise rejection:', err);
+});
+
+process.on('uncaughtException', err => {
+  console.error('Uncaught exception:', err);
+});
 
 // ---------------------- CityMart Giveaways ----------------------
 const GIVEAWAYS_FILE = path.join('/data', 'giveaways.json');
@@ -38,6 +52,7 @@ function loadGiveawaysFromDisk() {
     if (!fs.existsSync(GIVEAWAYS_FILE)) return;
     const raw = fs.readFileSync(GIVEAWAYS_FILE, 'utf8');
     const obj = JSON.parse(raw);
+
     for (const [messageId, g] of Object.entries(obj)) {
       giveaways.set(messageId, {
         messageId,
@@ -51,6 +66,7 @@ function loadGiveawaysFromDisk() {
         winnerId: g.winnerId || null
       });
     }
+
     console.log(`✅ Loaded ${giveaways.size} giveaways from disk`);
   } catch (err) {
     console.error('⚠️ Failed to load giveaways:', err);
@@ -60,6 +76,7 @@ function loadGiveawaysFromDisk() {
 function saveGiveawaysToDisk() {
   try {
     const obj = {};
+
     for (const [messageId, g] of giveaways.entries()) {
       obj[messageId] = {
         channelId: g.channelId,
@@ -72,6 +89,7 @@ function saveGiveawaysToDisk() {
         winnerId: g.winnerId
       };
     }
+
     fs.mkdirSync(path.dirname(GIVEAWAYS_FILE), { recursive: true });
     fs.writeFileSync(GIVEAWAYS_FILE, JSON.stringify(obj, null, 2), 'utf8');
   } catch (err) {
@@ -80,16 +98,17 @@ function saveGiveawaysToDisk() {
 }
 
 // Parse "YYYY-MM-DD HH:mm" -> timestamp (ms)
+// Note: this uses the server's local timezone.
 function parseGiveawayEnd(input) {
   if (!input) return null;
   const trimmed = input.trim();
   const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/);
   if (!m) return null;
 
-  const year   = Number(m[1]);
-  const month  = Number(m[2]) - 1; // 0-based
-  const day    = Number(m[3]);
-  const hour   = Number(m[4]);
+  const year = Number(m[1]);
+  const month = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
   const minute = Number(m[5]);
 
   const date = new Date(year, month, day, hour, minute, 0, 0);
@@ -98,273 +117,27 @@ function parseGiveawayEnd(input) {
   return ms;
 }
 
-// Button entry handler
-async function handleGiveawayEnterButton(interaction) {
-  const msg = interaction.message;
-  if (!msg || !msg.id) {
-    return interaction.reply({ content: 'This giveaway is no longer valid.', ephemeral: true });
-  }
-
-  const giveaway = giveaways.get(msg.id);
-  if (!giveaway) {
-    return interaction.reply({ content: 'This giveaway is no longer active.', ephemeral: true });
-  }
-
-  if (giveaway.ended || Date.now() >= giveaway.endAt) {
-    return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
-  }
-
-  // Rank-based entry requirement: CityMart Customer or higher
-  if (GIVEAWAY_MIN_ROLE_ID && interaction.guild) {
-    const guild = interaction.guild;
-    const minRole = guild.roles.cache.get(GIVEAWAY_MIN_ROLE_ID);
-
-    if (minRole) {
-      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
-
-      const hasRequiredRank =
-        member &&
-        member.roles.cache.some(role => role.position >= minRole.position);
-
-      if (!hasRequiredRank) {
-        const robloxLinkButton = new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setLabel('Join Roblox Community')
-            .setStyle(ButtonStyle.Link)
-            .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
-        );
-
-        return interaction.reply({
-          content:
-            '❌ You need to be a **CityMart Customer or higher** to enter this giveaway.\n' +
-            'Join our Roblox Community and verify via Bloxlink to get the required role. 🛒',
-          components: [robloxLinkButton],
-          ephemeral: true
-        });
-      }
-    }
-  }
-
-  const nowUnix = Math.floor(Date.now() / 1000);
-
-  // First-time entry
-  if (!giveaway.entrants.includes(interaction.user.id)) {
-    giveaway.entrants.push(interaction.user.id);
-    saveGiveawaysToDisk();
-
-    const enteredEmbed = new EmbedBuilder()
-      .setColor(0x00ff88)
-      .setTitle('✅ Giveaway Entry Confirmed')
-      .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
-      .setDescription(
-        [
-          `You are now officially entered in a **CityMart Giveaway**! 🎉`,
-          '',
-          `🎁 **Prize:** ${giveaway.prize}`,
-          `🕒 **Entered:** <t:${nowUnix}:F>  •  <t:${nowUnix}:R>`,
-          '',
-          `👤 **User:** ${interaction.user}`,
-          `🆔 **User ID:** \`${interaction.user.id}\``
-        ].join('\n')
-      )
-      .setFooter({ text: 'CityMart Services • Giveaway System' })
-      .setTimestamp();
-
-    return interaction.reply({
-      embeds: [enteredEmbed],
-      ephemeral: true
-    });
-  }
-
-  // Already entered
-  const alreadyEmbed = new EmbedBuilder()
-    .setColor(0xffc107)
-    .setTitle('ℹ️ Already Entered')
-    .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
-    .setDescription(
-      [
-        `You are already entered in this giveaway.`,
-        '',
-        `🎁 **Prize:** ${giveaway.prize}`,
-        `🕒 Checked: <t:${nowUnix}:F>  •  <t:${nowUnix}:R>`,
-        '',
-        `🆔 **User ID:** \`${interaction.user.id}\``
-      ].join('\n')
-    )
-    .setFooter({ text: 'CityMart Services • Giveaway System' })
-    .setTimestamp();
-
-  return interaction.reply({
-    embeds: [alreadyEmbed],
-    ephemeral: true
-  });
-}
-
-async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
-  // If first time ending, choose winner
-  if (!giveaway.ended && !reroll) {
-    giveaway.ended = true;
-  }
-
-  if (giveaway.entrants.length === 0) {
-    giveaway.winnerId = null;
-  } else {
-    // If reroll, pick a new winner (can be same, we keep it simple)
-    const idx = Math.floor(Math.random() * giveaway.entrants.length);
-    giveaway.winnerId = giveaway.entrants[idx];
-  }
-
-  try {
-    const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
-    if (channel && channel.isTextBased()) {
-      const msg = await channel.messages.fetch(messageId).catch(() => null);
-      if (msg) {
-        const baseEmbed = msg.embeds?.[0];
-        const embed = new EmbedBuilder(baseEmbed ?? {})
-          .setColor(0x00ff88)
-          .setTitle(reroll ? '🎁 CityMart Giveaway — Rerolled' : '🎁 CityMart Giveaway — Ended');
-
-        const lines = [
-          `Prize: **${giveaway.prize}**`,
-          giveaway.entrants.length
-            ? `Entries: **${giveaway.entrants.length}**`
-            : 'Entries: **0**'
-        ];
-
-        if (giveaway.winnerId) {
-          lines.push(`Winner: <@${giveaway.winnerId}> 🎉`);
-        } else {
-          lines.push('No winner could be chosen (no valid entries).');
-        }
-
-        embed.setDescription(lines.join('\n'));
-
-        await msg.edit({
-          embeds: [embed],
-          components: [] // remove the enter button
-        });
-
-        // 🔔 Public announcement embed
-        if (giveaway.winnerId) {
-          const publicEmbed = new EmbedBuilder()
-            .setColor(reroll ? 0xffc107 : 0x00ff88)
-            .setTitle(reroll ? '🎲 New Giveaway Winner!' : '🎉 Giveaway Winner!')
-            .setThumbnail(THUMBNAIL_URL)
-            .setDescription(
-              [
-                `Prize: **${giveaway.prize}**`,
-                `Winner: <@${giveaway.winnerId}>`,
-                `Entries: **${giveaway.entrants.length}**`,
-                '',
-                reroll
-                  ? 'A new winner has been selected for this giveaway.'
-                  : 'Thank you to everyone who entered!'
-              ].join('\n')
-            )
-            .setFooter({
-              text: giveaway.createdBy
-                ? `Hosted by ${msg.guild?.members?.cache.get(giveaway.createdBy)?.user?.tag || 'CityMart Staff'}`
-                : 'CityMart Giveaway'
-            })
-            .setTimestamp();
-
-          await channel.send({ embeds: [publicEmbed] });
-
-          // 📩 DM the winner (may fail if DMs are closed – we ignore that)
-          try {
-            const user =
-              msg.guild?.members?.cache.get(giveaway.winnerId)?.user ||
-              await client.users.fetch(giveaway.winnerId).catch(() => null);
-
-            if (user) {
-              const dmEmbed = new EmbedBuilder()
-                .setColor(0x00ff88)
-                .setTitle('🎉 You won a CityMart Giveaway!')
-                .setThumbnail(THUMBNAIL_URL)
-                .setDescription(
-                  [
-                    `Prize: **${giveaway.prize}**`,
-                    '',
-                    'You were drawn as the winner in a CityMart giveaway.',
-                    'Please open a support ticket in the CityMart server to claim your prize.'
-                  ].join('\n')
-                )
-                .setFooter({ text: 'CityMart Services' })
-                .setTimestamp();
-
-              const components =
-                SUPPORT_CHANNEL_ID && GUILD_ID
-                  ? [createSupportRow()]
-                  : [];
-
-              await user.send({ embeds: [dmEmbed], components }).catch(() => {});
-            }
-          } catch (dmErr) {
-            console.error('Failed to DM giveaway winner:', dmErr);
-          }
-                } else {
-          const noWinnerEmbed = new EmbedBuilder()
-            .setColor(0xd9534f)
-            .setTitle(reroll ? '😔 No New Winner Selected' : '😔 No Winner Selected')
-            .setThumbnail(THUMBNAIL_URL)
-            .setDescription(
-              [
-                `Prize: **${giveaway.prize}**`,
-                '',
-                'No valid entries were found for this giveaway.',
-                'Better luck next time!'
-              ].join('\n')
-            )
-            .setTimestamp();
-
-          await channel.send({ embeds: [noWinnerEmbed] });
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error ending/rerolling giveaway message:', err);
-  }
-
-  giveaways.set(messageId, giveaway);
-  saveGiveawaysToDisk();
-}
-
-async function checkGiveaways() {
-  const now = Date.now();
-  for (const [messageId, g] of giveaways.entries()) {
-    if (g.ended) continue;
-    if (now >= g.endAt) {
-      await endGiveaway(messageId, g, { reroll: false });
-      g.ended = true;
-    }
-  }
-}
-
-// Load on startup and schedule periodic checks (120s)
-loadGiveawaysFromDisk();
-setInterval(() => {
-  checkGiveaways().catch(err => console.error('checkGiveaways error:', err));
-}, 120_000);
-
 // ---------------------- Cooldowns & Rate Limits ----------------------
 const userCooldowns = new Map();
-const COOLDOWN_MS   = 5000; // generic per-user cooldown for mentions/slash
+const COOLDOWN_MS = 5000;
 
 // /ask-specific burst limit: 5 reqs / 60s per (guild:channel:user)
 const ASK_WINDOW_MS = 60_000;
-const ASK_MAX       = 5;
-const askBuckets    = new Map(); // key -> [timestamps]
+const ASK_MAX = 5;
+const askBuckets = new Map();
 
-// /members-specific: 1 req / 30s per user
+// /communitycount-specific: 1 req / 30s per user
 const MEMBERS_WINDOW_MS = 30_000;
-const membersBuckets = new Map(); // userId -> lastTimestamp
+const membersBuckets = new Map();
 
 // tiny in-memory history for /ask (per conversation)
-const MAX_TURNS   = 8; // 8 user+assistant pairs
-const askHistory  = new Map(); // key -> [{role, content}, ...]
+const MAX_TURNS = 8;
+const askHistory = new Map();
+
 function askKey(guildId, channelId, userId) {
   return `${guildId}:${channelId}:${userId}`;
 }
+
 function allowAsk(key) {
   const now = Date.now();
   const arr = (askBuckets.get(key) || []).filter(ts => now - ts < ASK_WINDOW_MS);
@@ -373,14 +146,21 @@ function allowAsk(key) {
   askBuckets.set(key, arr);
   return true;
 }
+
 function getHistory(key) {
   return askHistory.get(key) || [];
 }
+
 function pushTurn(key, userText, assistantText) {
   const prev = getHistory(key);
-  const next = [...prev, { role: 'user', content: userText }, { role: 'assistant', content: assistantText }];
+  const next = [
+    ...prev,
+    { role: 'user', content: userText },
+    { role: 'assistant', content: assistantText }
+  ];
   askHistory.set(key, next.slice(-MAX_TURNS * 2));
 }
+
 function allowMembersCheck(userId) {
   const last = membersBuckets.get(userId) || 0;
   const now = Date.now();
@@ -389,17 +169,19 @@ function allowMembersCheck(userId) {
   return true;
 }
 
-// Periodic cleanup of stale maps (memory hygiene)
+// Periodic cleanup of stale maps
 setInterval(() => {
-  const cutoff = Date.now() - 60 * 60 * 1000; // 1h
-  for (const [uid, ts] of userCooldowns) if (ts < cutoff) userCooldowns.delete(uid);
+  const cutoff = Date.now() - 60 * 60 * 1000;
+
+  for (const [uid, ts] of userCooldowns) {
+    if (ts < cutoff) userCooldowns.delete(uid);
+  }
 
   for (const [key, stamps] of askBuckets) {
     const pruned = stamps.filter(t => Date.now() - t < ASK_WINDOW_MS);
     if (pruned.length) askBuckets.set(key, pruned);
     else askBuckets.delete(key);
   }
-  // membersBuckets: keep lightweight; no need to prune aggressively
 }, 30 * 60 * 1000);
 
 // ---------------------- Environment ----------------------
@@ -420,26 +202,20 @@ const {
   EASYPOS_RANKING_MOD_ID
 } = process.env;
 
-if (!DISCORD_TOKEN)       console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
-if (!GUILD_ID)            console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
-if (!WORKER_URL)          console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
-if (!SUPPORT_CHANNEL_ID)  console.warn('⚠️ SUPPORT_CHANNEL_ID is not set.');
-if (!GENERAL_CHANNEL_ID)  console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
+if (!DISCORD_TOKEN) console.warn('⚠️ DISCORD_TOKEN is not set; bot login will fail.');
+if (!GUILD_ID) console.warn('⚠️ GUILD_ID is not set; some links (like support) may be invalid.');
+if (!WORKER_URL) console.warn('⚠️ WORKER_URL is not set; /ask will fail.');
+if (!SUPPORT_CHANNEL_ID) console.warn('⚠️ SUPPORT_CHANNEL_ID is not set.');
+if (!GENERAL_CHANNEL_ID) console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
 if (!COMMANDS_CHANNEL_ID) console.warn('⚠️ COMMANDS_CHANNEL_ID is not set (Roblox tracker + toasts).');
-if (!ROBLOX_GROUP_ID)     console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /communitycount + memberlookup badge).');
-if (!BOT_URL)             console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
-if (!GIVEAWAY_MIN_ROLE_ID)
-  console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
-if (!EASYPOS_TOKEN)
-  console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
-if (!EASYPOS_DONATIONS_TOKEN)
-  console.warn('⚠️ EASYPOS_DONATIONS_TOKEN not set — /donations and /donationsleaderboard will be disabled.');
-if (!EASYPOS_RANKING_TOKEN)
-  console.warn('⚠️ EASYPOS_RANKING_TOKEN not set — /ranking commands will be disabled.');
-if (!EASYPOS_RANKING_MOD_ID)
-  console.warn('⚠️ EASYPOS_RANKING_MOD_ID not set — /ranking has no modId to send to easyPOS.');
+if (!ROBLOX_GROUP_ID) console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /communitycount + memberlookup badge).');
+if (!BOT_URL) console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
+if (!GIVEAWAY_MIN_ROLE_ID) console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
+if (!EASYPOS_TOKEN) console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
+if (!EASYPOS_DONATIONS_TOKEN) console.warn('⚠️ EASYPOS_DONATIONS_TOKEN not set — /donations and /donationsleaderboard will be disabled.');
+if (!EASYPOS_RANKING_TOKEN) console.warn('⚠️ EASYPOS_RANKING_TOKEN not set — /ranking commands will be disabled.');
+if (!EASYPOS_RANKING_MOD_ID) console.warn('⚠️ EASYPOS_RANKING_MOD_ID not set — /ranking has no modId to send to easyPOS.');
 
-// Polite identification for outbound requests
 const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
 
 // ---------------------- Discord Client ----------------------
@@ -456,16 +232,13 @@ const client = new Client({
 // ---------------------- Constants ----------------------
 const THUMBNAIL_URL = 'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
 
-// Custom emojis
 const CITYMART_EMOJI_RAW = '<:citymart:1400628955253575711>';
-const LAMP_EMOJI_RAW     = '<:lamp:1402100477134508222>';
-const CITYMART_EMOJI     = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_EMOJI_RAW : '🛒';
-const LAMP_EMOJI         = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW)    ? LAMP_EMOJI_RAW    : '💡';
+const LAMP_EMOJI_RAW = '<:lamp:1402100477134508222>';
+const CITYMART_EMOJI = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_EMOJI_RAW : '🛒';
+const LAMP_EMOJI = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW) ? LAMP_EMOJI_RAW : '💡';
 
-// Reaction keywords
-const REACTION_KEYWORDS = ['shopping','mart','cart','shop','store','lamp','citymart'];
+const REACTION_KEYWORDS = ['shopping', 'mart', 'cart', 'shop', 'store', 'lamp', 'citymart'];
 
-// Utility to escape regex special chars (from your utils)
 const escapeForRegex = require('./utils/escapeForRegex');
 
 // ---------------------- CityCraft ----------------------
@@ -474,7 +247,7 @@ const CITYCRAFT_OWNER_USER_ID = '651525636351066182';
 
 // ---------------------- Small cache (5 min TTL) ----------------------
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const cache = new Map(); // key -> { value, expires }
+const cache = new Map();
 
 function cacheGet(key) {
   const hit = cache.get(key);
@@ -485,11 +258,34 @@ function cacheGet(key) {
   }
   return hit.value;
 }
+
 function cacheSet(key, value, ttl = CACHE_TTL_MS) {
   cache.set(key, { value, expires: Date.now() + ttl });
 }
 
-// ---------------------- Roblox helpers (memberlookup) ----------------------
+// ---------------------- Helpers ----------------------
+function createSupportRow() {
+  if (!GUILD_ID || !SUPPORT_CHANNEL_ID) return null;
+
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel('Go to Support')
+      .setEmoji('❓')
+      .setStyle(ButtonStyle.Link)
+      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
+  );
+}
+
+function createLinkRow(url, label) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setLabel(label)
+      .setStyle(ButtonStyle.Link)
+      .setURL(url)
+  );
+}
+
+// ---------------------- Roblox helpers ----------------------
 async function robloxUsernameToId(username) {
   const key = `uname:${username.toLowerCase()}`;
   const cached = cacheGet(key);
@@ -497,10 +293,18 @@ async function robloxUsernameToId(username) {
 
   const res = await fetch('https://users.roblox.com/v1/usernames/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'User-Agent': OUTBOUND_UA },
-    body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': OUTBOUND_UA
+    },
+    body: JSON.stringify({
+      usernames: [username],
+      excludeBannedUsers: false
+    })
   });
+
   if (!res.ok) throw new Error(`Roblox username lookup failed (${res.status})`);
+
   const data = await res.json();
   const id = data?.data?.[0]?.id ?? null;
   cacheSet(key, id);
@@ -510,12 +314,14 @@ async function robloxUsernameToId(username) {
 async function robloxUserInfo(userId) {
   const key = `user:${userId}`;
   const cached = cacheGet(key);
-  if (cached) return cached;
+  if (cached !== null) return cached;
 
   const res = await fetch(`https://users.roblox.com/v1/users/${userId}`, {
     headers: { 'User-Agent': OUTBOUND_UA }
   });
+
   if (!res.ok) throw new Error(`Roblox user info failed (${res.status})`);
+
   const info = await res.json();
   cacheSet(key, info);
   return info;
@@ -527,37 +333,50 @@ async function robloxAvatarThumb(userId) {
   if (cached !== null) return cached;
 
   const url = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`;
-  const res = await fetch(url, { headers: { 'User-Agent': OUTBOUND_UA } });
-  if (!res.ok) { cacheSet(key, null); return null; }
+  const res = await fetch(url, {
+    headers: { 'User-Agent': OUTBOUND_UA }
+  });
+
+  if (!res.ok) {
+    cacheSet(key, null);
+    return null;
+  }
+
   const data = await res.json();
   const imageUrl = data?.data?.[0]?.imageUrl ?? null;
   cacheSet(key, imageUrl);
   return imageUrl;
 }
 
-// ⭐ CityMart group role lookup
 async function robloxGroupRole(userId, groupId) {
   const key = `role:${userId}:${groupId}`;
   const cached = cacheGet(key);
   if (cached !== null) return cached;
 
   const url = `https://groups.roblox.com/v1/users/${userId}/groups/roles`;
-  const res = await fetch(url, { headers: { 'User-Agent': OUTBOUND_UA } });
-  if (!res.ok) { cacheSet(key, null); return null; }
+  const res = await fetch(url, {
+    headers: { 'User-Agent': OUTBOUND_UA }
+  });
+
+  if (!res.ok) {
+    cacheSet(key, null);
+    return null;
+  }
 
   const data = await res.json();
   const groupInfo = Array.isArray(data?.data)
     ? data.data.find(g => String(g.group?.id) === String(groupId))
     : null;
-  const role = groupInfo?.role || null;
 
+  const role = groupInfo?.role || null;
   cacheSet(key, role);
   return role;
 }
 
-function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
+function buildMemberLookupEmbed(info, avatarUrl) {
   const profileUrl = `https://www.roblox.com/users/${info.id}/profile`;
   const joined = new Date(info.created);
+
   const embed = new EmbedBuilder()
     .setTitle(`Roblox: ${info.displayName ?? info.name}`)
     .setURL(profileUrl)
@@ -574,7 +393,6 @@ function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
     )
     .setTimestamp();
 
-  // NEW: CityMart role display
   if (info.citymartRole) {
     embed.addFields({
       name: 'CityMart Role',
@@ -593,7 +411,7 @@ function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
   if (desc) {
     embed.addFields({
       name: 'Bio',
-      value: desc.length > 1024 ? desc.slice(0, 1015) + '…' : desc
+      value: desc.length > 1024 ? `${desc.slice(0, 1015)}…` : desc
     });
   }
 
@@ -605,10 +423,11 @@ function buildMemberLookupEmbed(info, avatarUrl /*, inGroup */) {
         .setURL(profileUrl)
     )
   ];
+
   return { embed, components };
 }
 
-// ---------------------- easyPOS Activity helpers ----------------------
+// ---------------------- easyPOS helpers ----------------------
 const EASYPOS_BASE_URL = 'https://papi.easypos.lol';
 
 async function fetchEasyPosActivity(userId) {
@@ -628,15 +447,11 @@ async function fetchEasyPosActivity(userId) {
     })
   });
 
-  if (!res.ok) {
-    throw new Error(`easyPOS HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`easyPOS HTTP ${res.status}`);
 
-  const data = await res.json();
-  return data; // { success, error?, data? }
+  return res.json();
 }
 
-// ---------------------- easyPOS Donation helpers ----------------------
 async function fetchEasyPosDonations(userId) {
   if (!EASYPOS_DONATIONS_TOKEN) {
     throw new Error('EASYPOS_DONATIONS_TOKEN not configured');
@@ -659,9 +474,7 @@ async function fetchEasyPosDonations(userId) {
     throw new Error(`easyPOS donations HTTP ${res.status}: ${text}`);
   }
 
-  const body = await res.json();
-  // Shape: { success: boolean, error?: string, data?: { userId, amount } }
-  return body;
+  return res.json();
 }
 
 async function fetchEasyPosDonationsLeaderboard() {
@@ -685,12 +498,9 @@ async function fetchEasyPosDonationsLeaderboard() {
     throw new Error(`easyPOS donations leaderboard HTTP ${res.status}: ${text}`);
   }
 
-  const body = await res.json();
-  // Shape: { success: boolean, error?: string, data?: { donations: [...] } }
-  return body;
+  return res.json();
 }
 
-// ---------------------- easyPOS Ranking helpers ----------------------
 async function fetchEasyPosPromote(userId, modId, scaleCode) {
   if (!EASYPOS_RANKING_TOKEN) {
     throw new Error('EASYPOS_RANKING_TOKEN not configured');
@@ -702,7 +512,6 @@ async function fetchEasyPosPromote(userId, modId, scaleCode) {
     modId: Number(modId)
   };
 
-  // Only required if on minimum rank – we pass it if provided
   if (scaleCode) {
     payload.scaleCode = String(scaleCode);
   }
@@ -721,9 +530,7 @@ async function fetchEasyPosPromote(userId, modId, scaleCode) {
     throw new Error(`easyPOS ranking/promote HTTP ${res.status}: ${text}`);
   }
 
-  const body = await res.json();
-  // body: { success, error?, data?: { rank? } }
-  return body;
+  return res.json();
 }
 
 async function fetchEasyPosDemote(userId, modId) {
@@ -751,16 +558,13 @@ async function fetchEasyPosDemote(userId, modId) {
     throw new Error(`easyPOS ranking/demote HTTP ${res.status}: ${text}`);
   }
 
-  const body = await res.json();
-  // body: { success, error?, data?: { rank? } }
-  return body;
+  return res.json();
 }
 
-// ---------------------- CityCraft function ----------------------
-
+// ---------------------- CityCraft ----------------------
 function buildCityCraftEmbed() {
   const embed = new EmbedBuilder()
-    .setColor(0x57F287) // Discord green
+    .setColor(0x57F287)
     .setTitle('🧱 CityCraft — Whitelisted Minecraft Server')
     .setDescription(
       [
@@ -866,8 +670,7 @@ const TRIGGERS = [
       .setColor(0xFFD700)
       .setDescription(
         "💡 We don't talk about the lamp. The lamp doesn't exist.\n\n" +
-        "Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, " +
-        "no one dares mention it again. Handle with caution!"
+        "Ever since that malicious lamp script from the Roblox toolbox infiltrated CityMart, no one dares mention it again. Handle with caution!"
       )
       .setImage('https://storage.davevancauwenberghe.be/citymart/visuals/lamp.png')
       .setFooter({ text: 'Shh... the lamp is gone' })
@@ -885,28 +688,12 @@ const HELP_EMBED = new EmbedBuilder()
   .setDescription('Use @CityMart Services <keyword> or slash commands to interact.')
   .addFields(
     { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
-    { name: '🆘 Support',      value: 'support\ndocumentation',             inline: false },
-    { name: '📖 Misc',         value: 'lorebook\nlamp\nping\nask\ncommunitycount\nmemberlookup <username>', inline: false },
-    { name: '🔗 Dashboard',    value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
+    { name: '🆘 Support', value: 'support\ndocumentation', inline: false },
+    { name: '📖 Misc', value: 'lorebook\nlamp\nping\nask\ncommunitycount\nmemberlookup <username>', inline: false },
+    { name: '🔗 Dashboard', value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
-
-// ---------------------- Helpers ----------------------
-function createSupportRow() {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setLabel('Go to Support')
-      .setEmoji('❓')
-      .setStyle(ButtonStyle.Link)
-      .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
-  );
-}
-function createLinkRow(url, label) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setLabel(label).setStyle(ButtonStyle.Link).setURL(url)
-  );
-}
 
 // ---------------------- Roblox member count tracker ----------------------
 let lastMemberCount = null;
@@ -927,19 +714,23 @@ function updatePresence() {
 }
 
 async function fetchRobloxMemberCount(groupId) {
-  // Public endpoint: https://groups.roblox.com/v1/groups/{groupId}
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 10000); // 10s timeout
+  const t = setTimeout(() => ctrl.abort(), 10000);
+
   try {
     const res = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`, {
       signal: ctrl.signal,
       headers: { 'User-Agent': OUTBOUND_UA }
     });
+
     clearTimeout(t);
+
     if (!res.ok) throw new Error(`Roblox API HTTP ${res.status}`);
+
     const data = await res.json();
     const count = Number(data?.memberCount);
     if (!Number.isFinite(count)) throw new Error('memberCount not found');
+
     return count;
   } catch (e) {
     clearTimeout(t);
@@ -949,11 +740,11 @@ async function fetchRobloxMemberCount(groupId) {
 
 async function pollRobloxMembers() {
   if (!ROBLOX_GROUP_ID || !COMMANDS_CHANNEL_ID) return;
+
   try {
     const current = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
 
     if (lastMemberCount === null) {
-      // first sync: set count, update presence, no announcement
       lastMemberCount = current;
       updatePresence();
       return;
@@ -962,8 +753,6 @@ async function pollRobloxMembers() {
     if (current !== lastMemberCount) {
       const diff = current - lastMemberCount;
       lastMemberCount = current;
-
-      // update presence whenever the count changes
       updatePresence();
 
       const channel = await client.channels.fetch(COMMANDS_CHANNEL_ID).catch(() => null);
@@ -971,6 +760,7 @@ async function pollRobloxMembers() {
 
       const growing = diff > 0;
       const abs = Math.abs(diff);
+
       const title = growing
         ? `🎉 New ${abs === 1 ? 'member has' : `${abs} members have`} joined the Roblox Community!`
         : `👋 ${abs === 1 ? 'A member has' : `${abs} members have`} left the Roblox Community.`;
@@ -985,28 +775,269 @@ async function pollRobloxMembers() {
         .setThumbnail(THUMBNAIL_URL)
         .setTimestamp();
 
-      const row = createLinkRow(COMMUNITY_URL, 'Open Roblox Community');
-      await channel.send({ embeds: [embed], components: [row] });
+      await channel.send({
+        embeds: [embed],
+        components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')]
+      });
     }
   } catch (err) {
-    // Silent-ish; log to console but do not spam Discord
     console.error('Roblox tracker error:', err?.message || err);
   }
 }
+
+// ---------------------- Giveaway helpers ----------------------
+async function handleGiveawayEnterButton(interaction) {
+  const msg = interaction.message;
+  if (!msg || !msg.id) {
+    return interaction.reply({ content: 'This giveaway is no longer valid.', ephemeral: true });
+  }
+
+  const giveaway = giveaways.get(msg.id);
+  if (!giveaway) {
+    return interaction.reply({ content: 'This giveaway is no longer active.', ephemeral: true });
+  }
+
+  if (giveaway.ended || Date.now() >= giveaway.endAt) {
+    return interaction.reply({ content: 'This giveaway has already ended.', ephemeral: true });
+  }
+
+  if (GIVEAWAY_MIN_ROLE_ID && interaction.guild) {
+    const guild = interaction.guild;
+    const minRole = guild.roles.cache.get(GIVEAWAY_MIN_ROLE_ID);
+
+    if (minRole) {
+      const member = await guild.members.fetch(interaction.user.id).catch(() => null);
+
+      const hasRequiredRank =
+        member &&
+        member.roles.cache.some(role => role.position >= minRole.position);
+
+      if (!hasRequiredRank) {
+        const robloxLinkButton = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('Join Roblox Community')
+            .setStyle(ButtonStyle.Link)
+            .setURL('https://www.roblox.com/communities/36060455/CityMart-Group#!/about')
+        );
+
+        return interaction.reply({
+          content:
+            '❌ You need to be a **CityMart Customer or higher** to enter this giveaway.\n' +
+            'Join our Roblox Community and verify via Bloxlink to get the required role. 🛒',
+          components: [robloxLinkButton],
+          ephemeral: true
+        });
+      }
+    }
+  }
+
+  const nowUnix = Math.floor(Date.now() / 1000);
+
+  if (!giveaway.entrants.includes(interaction.user.id)) {
+    giveaway.entrants.push(interaction.user.id);
+    saveGiveawaysToDisk();
+
+    const enteredEmbed = new EmbedBuilder()
+      .setColor(0x00ff88)
+      .setTitle('✅ Giveaway Entry Confirmed')
+      .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+      .setDescription(
+        [
+          'You are now officially entered in a **CityMart Giveaway**! 🎉',
+          '',
+          `🎁 **Prize:** ${giveaway.prize}`,
+          `🕒 **Entered:** <t:${nowUnix}:F>  •  <t:${nowUnix}:R>`,
+          '',
+          `👤 **User:** ${interaction.user}`,
+          `🆔 **User ID:** \`${interaction.user.id}\``
+        ].join('\n')
+      )
+      .setFooter({ text: 'CityMart Services • Giveaway System' })
+      .setTimestamp();
+
+    return interaction.reply({
+      embeds: [enteredEmbed],
+      ephemeral: true
+    });
+  }
+
+  const alreadyEmbed = new EmbedBuilder()
+    .setColor(0xffc107)
+    .setTitle('ℹ️ Already Entered')
+    .setThumbnail(interaction.user.displayAvatarURL({ size: 256 }))
+    .setDescription(
+      [
+        'You are already entered in this giveaway.',
+        '',
+        `🎁 **Prize:** ${giveaway.prize}`,
+        `🕒 Checked: <t:${nowUnix}:F>  •  <t:${nowUnix}:R>`,
+        '',
+        `🆔 **User ID:** \`${interaction.user.id}\``
+      ].join('\n')
+    )
+    .setFooter({ text: 'CityMart Services • Giveaway System' })
+    .setTimestamp();
+
+  return interaction.reply({
+    embeds: [alreadyEmbed],
+    ephemeral: true
+  });
+}
+
+async function endGiveaway(messageId, giveaway, { reroll = false } = {}) {
+  if (!giveaway.ended && !reroll) {
+    giveaway.ended = true;
+  }
+
+  if (giveaway.entrants.length === 0) {
+    giveaway.winnerId = null;
+  } else {
+    const idx = Math.floor(Math.random() * giveaway.entrants.length);
+    giveaway.winnerId = giveaway.entrants[idx];
+  }
+
+  try {
+    const channel = await client.channels.fetch(giveaway.channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+      giveaways.set(messageId, giveaway);
+      saveGiveawaysToDisk();
+      return;
+    }
+
+    const msg = await channel.messages.fetch(messageId).catch(() => null);
+
+    if (msg) {
+      const baseEmbed = msg.embeds?.[0];
+      const updatedEmbed = new EmbedBuilder(baseEmbed ?? {})
+        .setColor(0x00ff88)
+        .setTitle(reroll ? '🎁 CityMart Giveaway — Rerolled' : '🎁 CityMart Giveaway — Ended');
+
+      const lines = [
+        `Prize: **${giveaway.prize}**`,
+        giveaway.entrants.length ? `Entries: **${giveaway.entrants.length}**` : 'Entries: **0**'
+      ];
+
+      if (giveaway.winnerId) {
+        lines.push(`Winner: <@${giveaway.winnerId}> 🎉`);
+      } else {
+        lines.push('No winner could be chosen (no valid entries).');
+      }
+
+      updatedEmbed.setDescription(lines.join('\n'));
+
+      await msg.edit({
+        embeds: [updatedEmbed],
+        components: []
+      });
+    }
+
+    if (giveaway.winnerId) {
+      const publicEmbed = new EmbedBuilder()
+        .setColor(reroll ? 0xffc107 : 0x00ff88)
+        .setTitle(reroll ? '🎲 New Giveaway Winner!' : '🎉 Giveaway Winner!')
+        .setThumbnail(THUMBNAIL_URL)
+        .setDescription(
+          [
+            `Prize: **${giveaway.prize}**`,
+            `Winner: <@${giveaway.winnerId}>`,
+            `Entries: **${giveaway.entrants.length}**`,
+            '',
+            reroll
+              ? 'A new winner has been selected for this giveaway.'
+              : 'Thank you to everyone who entered!'
+          ].join('\n')
+        )
+        .setFooter({
+          text: giveaway.createdBy
+            ? `Hosted by ${msg?.guild?.members?.cache.get(giveaway.createdBy)?.user?.tag || 'CityMart Staff'}`
+            : 'CityMart Giveaway'
+        })
+        .setTimestamp();
+
+      await channel.send({ embeds: [publicEmbed] });
+
+      try {
+        const winnerUser =
+          msg?.guild?.members?.cache.get(giveaway.winnerId)?.user ||
+          await client.users.fetch(giveaway.winnerId).catch(() => null);
+
+        if (winnerUser) {
+          const dmEmbed = new EmbedBuilder()
+            .setColor(0x00ff88)
+            .setTitle('🎉 You won a CityMart Giveaway!')
+            .setThumbnail(THUMBNAIL_URL)
+            .setDescription(
+              [
+                `Prize: **${giveaway.prize}**`,
+                '',
+                'You were drawn as the winner in a CityMart giveaway.',
+                'Please open a support ticket in the CityMart server to claim your prize.'
+              ].join('\n')
+            )
+            .setFooter({ text: 'CityMart Services' })
+            .setTimestamp();
+
+          const supportRow = createSupportRow();
+          const components = supportRow ? [supportRow] : [];
+
+          await winnerUser.send({ embeds: [dmEmbed], components }).catch(() => {});
+        }
+      } catch (dmErr) {
+        console.error('Failed to DM giveaway winner:', dmErr);
+      }
+    } else {
+      const noWinnerEmbed = new EmbedBuilder()
+        .setColor(0xd9534f)
+        .setTitle(reroll ? '😔 No New Winner Selected' : '😔 No Winner Selected')
+        .setThumbnail(THUMBNAIL_URL)
+        .setDescription(
+          [
+            `Prize: **${giveaway.prize}**`,
+            '',
+            'No valid entries were found for this giveaway.',
+            'Better luck next time!'
+          ].join('\n')
+        )
+        .setTimestamp();
+
+      await channel.send({ embeds: [noWinnerEmbed] });
+    }
+  } catch (err) {
+    console.error('Error ending/rerolling giveaway message:', err);
+  }
+
+  giveaways.set(messageId, giveaway);
+  saveGiveawaysToDisk();
+}
+
+async function checkGiveaways() {
+  const now = Date.now();
+
+  for (const [messageId, g] of giveaways.entries()) {
+    if (g.ended) continue;
+    if (now >= g.endAt) {
+      await endGiveaway(messageId, g, { reroll: false });
+      g.ended = true;
+    }
+  }
+}
+
+// Load giveaway state and schedule checks
+loadGiveawaysFromDisk();
+setInterval(() => {
+  checkGiveaways().catch(err => console.error('checkGiveaways error:', err));
+}, 120_000);
 
 // ---------------------- Lifecycle ----------------------
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  // Initial presence (before we know the member count)
   updatePresence();
 
-  // Presence refresh for resilience (uses same helper)
   setInterval(() => {
     updatePresence();
   }, 10 * 60 * 1000);
 
-  // Fun randomized "I'm back!" message to #general
   const comebackLines = [
     "Beep boop, system reboot complete. I'm back online!",
     "Well, that was a nice nap. Ready to serve again! 🛒",
@@ -1018,11 +1049,12 @@ client.once('ready', async () => {
     "Went to CityBean, but couldn't miss out any longer. Ping me whenever!",
     "Oh, thought the lamp caught me for a second there! But I've used /e dance and I'm back."
   ];
+
   const randomMessage = comebackLines[Math.floor(Math.random() * comebackLines.length)];
 
   try {
     if (GENERAL_CHANNEL_ID) {
-      const channel = await client.channels.fetch(GENERAL_CHANNEL_ID);
+      const channel = await client.channels.fetch(GENERAL_CHANNEL_ID).catch(() => null);
       if (channel?.isTextBased()) {
         const embed = new EmbedBuilder()
           .setColor('#38a34a')
@@ -1041,37 +1073,34 @@ client.once('ready', async () => {
     console.error('⚠️ Could not send comeback message:', err);
   }
 
-  // Kick off Roblox tracker
   if (ROBLOX_GROUP_ID && COMMANDS_CHANNEL_ID) {
-    // initial sync (no toast) + 15 min interval
     pollRobloxMembers();
     setInterval(pollRobloxMembers, 15 * 60 * 1000);
   }
 });
 
-// ---------------------- Mention-based keywords ----------------------
+// ---------------------- Guild message handler ----------------------
 client.on('messageCreate', async message => {
   try {
-    if (message.author.bot) return;
+    if (message.author.bot || !message.guild) return;
 
-    // Generic cooldown
-    const now  = Date.now();
+    const now = Date.now();
     const last = userCooldowns.get(message.author.id) || 0;
     if (now - last < COOLDOWN_MS) return;
     userCooldowns.set(message.author.id, now);
 
     const msg = message.content.toLowerCase();
 
-    // React with emoji (lamp gets lamp emoji)
     for (const word of REACTION_KEYWORDS) {
       if (msg.includes(word)) {
         const emojiToUse = word === 'lamp' ? LAMP_EMOJI : CITYMART_EMOJI;
-        try { await message.react(emojiToUse); } catch {}
+        try {
+          await message.react(emojiToUse);
+        } catch {}
         break;
       }
     }
 
-    // Lamp embed fires anytime (no mention required)
     if (LAMP_TRIGGER && LAMP_TRIGGER.regex.test(msg)) {
       return message.channel.send({
         content: `${message.author}`,
@@ -1079,24 +1108,31 @@ client.on('messageCreate', async message => {
       });
     }
 
-    // ---- memberlookup as mention-keyword: "@bot memberlookup SomeUser" ----
     if (message.mentions.has(client.user)) {
       const mlMatch = message.content.match(/\bmemberlookup\s+([A-Za-z0-9_]{3,20})/i);
       if (mlMatch) {
         const username = mlMatch[1];
+
         try {
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return message.reply(`Couldn't find a Roblox user named **${username}**.`);
           }
+
           const [info, avatarUrl, role] = await Promise.all([
             robloxUserInfo(userId),
             robloxAvatarThumb(userId),
             ROBLOX_GROUP_ID ? robloxGroupRole(userId, ROBLOX_GROUP_ID) : Promise.resolve(null)
           ]);
+
           info.citymartRole = role;
           const { embed, components } = buildMemberLookupEmbed(info, avatarUrl);
-          return message.channel.send({ content: `${message.author}`, embeds: [embed], components });
+
+          return message.channel.send({
+            content: `${message.author}`,
+            embeds: [embed],
+            components
+          });
         } catch (e) {
           console.error('memberlookup error:', e);
           return message.reply('⚠️ Something went wrong fetching that user.');
@@ -1104,10 +1140,8 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // Other keywords require mention
     if (!message.mentions.has(client.user)) return;
 
-    // Ping (mention-based)
     if (/\bping\b/i.test(msg)) {
       const latency = Date.now() - message.createdTimestamp;
       const pingEmbed = new EmbedBuilder()
@@ -1117,17 +1151,22 @@ client.on('messageCreate', async message => {
         .setColor(0x00FFAA)
         .setFooter({ text: 'CityMart Services' })
         .setTimestamp();
-      return message.channel.send({ content: `${message.author}`, embeds: [pingEmbed] });
+
+      return message.channel.send({
+        content: `${message.author}`,
+        embeds: [pingEmbed]
+      });
     }
 
-    // Community count (mention-based keyword) — accepts "members" OR "communitycount"
     if (/\b(members?|communitycount)\b/i.test(msg)) {
       if (!allowMembersCheck(message.author.id)) {
         return message.reply('⏳ Please wait a bit before checking member counts again.');
       }
+
       if (!ROBLOX_GROUP_ID) {
         return message.reply('⚠️ ROBLOX_GROUP_ID not configured.');
       }
+
       try {
         const count = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
         const embed = new EmbedBuilder()
@@ -1137,26 +1176,30 @@ client.on('messageCreate', async message => {
           .setURL(COMMUNITY_URL)
           .setThumbnail(THUMBNAIL_URL)
           .setTimestamp();
+
         return message.channel.send({
           content: `${message.author}`,
           embeds: [embed],
           components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')]
         });
-      } catch (e) {
+      } catch {
         return message.reply('❌ Could not fetch the member count right now. Try again later.');
       }
     }
 
-    // Other trigger keywords
     for (const trigger of TRIGGERS) {
       if (trigger.keyword === 'lamp') continue;
+
       if (trigger.regex.test(msg)) {
         let components = [];
+
         if (trigger.keyword === 'support') {
-          components = [createSupportRow()];
+          const supportRow = createSupportRow();
+          components = supportRow ? [supportRow] : [];
         } else if (trigger.url && trigger.buttonLabel) {
           components = [createLinkRow(trigger.url, trigger.buttonLabel)];
         }
+
         return message.channel.send({
           content: `${message.author}`,
           embeds: [trigger.embed],
@@ -1165,27 +1208,26 @@ client.on('messageCreate', async message => {
       }
     }
 
-    // Fallback: help embed
-    await message.channel.send({ content: `${message.author}`, embeds: [HELP_EMBED] });
+    await message.channel.send({
+      content: `${message.author}`,
+      embeds: [HELP_EMBED]
+    });
   } catch (err) {
-    console.error('Error in messageCreate:', err);
+    console.error('Error in guild messageCreate:', err);
   }
 });
 
-// ---------------------- DM Handler (Giveaway Winner Support Redirect) ----------------------
+// ---------------------- DM handler ----------------------
 client.on('messageCreate', async message => {
   try {
-    // Ignore bot messages and guild messages — this is DM-only logic
     if (message.author.bot || message.guild) return;
 
     const dmChannel = message.channel;
-
-    // Try to detect if user previously received a giveaway-winner DM
     let isGiveawayWinnerFollowup = false;
 
     try {
       const history = await dmChannel.messages.fetch({ limit: 10 }).catch(() => null);
-      
+
       if (history) {
         const lastBotMsg = history
           .filter(m => m.author.id === client.user.id && m.id !== message.id)
@@ -1195,20 +1237,15 @@ client.on('messageCreate', async message => {
         if (lastBotMsg) {
           const combined = [
             lastBotMsg.content || '',
-            ...(lastBotMsg.embeds || []).map(e =>
-              `${e.title || ''} ${e.description || ''}`
-            )
+            ...(lastBotMsg.embeds || []).map(e => `${e.title || ''} ${e.description || ''}`)
           ].join(' ');
 
-          // Matches the title we use in the giveaway winner DM embed
           if (combined.includes('You won a CityMart Giveaway!')) {
             isGiveawayWinnerFollowup = true;
           }
         }
       }
-    } catch {
-      // If history fetch fails, we just fall back to the generic support reply
-    }
+    } catch {}
 
     const title = isGiveawayWinnerFollowup
       ? '🎉 You Won a CityMart Giveaway!'
@@ -1236,22 +1273,8 @@ client.on('messageCreate', async message => {
       .setFooter({ text: 'CityMart Services Support' })
       .setTimestamp();
 
-    const components =
-      SUPPORT_CHANNEL_ID && GUILD_ID
-        ? [
-            new ActionRowBuilder().addComponents(
-              new ButtonBuilder()
-                .setLabel(
-                  isGiveawayWinnerFollowup
-                    ? 'Claim Prize via Support'
-                    : 'Open Support Channel'
-                )
-                .setEmoji('❓')
-                .setStyle(ButtonStyle.Link)
-                .setURL(`https://discord.com/channels/${GUILD_ID}/${SUPPORT_CHANNEL_ID}`)
-            )
-          ]
-        : [];
+    const supportRow = createSupportRow();
+    const components = supportRow ? [supportRow] : [];
 
     await message.reply({ embeds: [embed], components });
   } catch (err) {
@@ -1263,10 +1286,10 @@ client.on('messageCreate', async message => {
 client.on('interactionCreate', async interaction => {
   try {
     if (!interaction.isChatInputCommand()) return;
+
     const { commandName, createdTimestamp, user, guildId, channelId } = interaction;
 
-    // Generic per-user cooldown
-    const now  = Date.now();
+    const now = Date.now();
     const last = userCooldowns.get(user.id) || 0;
     if (now - last < COOLDOWN_MS) {
       return interaction.reply({
@@ -1288,16 +1311,20 @@ client.on('interactionCreate', async interaction => {
       case 'lorebook':
       case 'lamp': {
         const trigger = TRIGGERS.find(t => t.keyword === commandName);
+
         const opts = {
           content: `${user}`,
           embeds: [trigger.embed],
           ephemeral: false
         };
+
         if (commandName === 'support') {
-          opts.components = [createSupportRow()];
+          const supportRow = createSupportRow();
+          opts.components = supportRow ? [supportRow] : [];
         } else if (trigger?.url && trigger?.buttonLabel) {
           opts.components = [createLinkRow(trigger.url, trigger.buttonLabel)];
         }
+
         return interaction.reply(opts);
       }
 
@@ -1310,10 +1337,10 @@ client.on('interactionCreate', async interaction => {
           .setColor(0x00FFAA)
           .setFooter({ text: 'CityMart Services' })
           .setTimestamp();
+
         return interaction.reply({ embeds: [pingEmbed], ephemeral: false });
       }
 
-      // renamed from /members → /communitycount
       case 'communitycount': {
         if (!allowMembersCheck(user.id)) {
           return interaction.reply({
@@ -1321,13 +1348,16 @@ client.on('interactionCreate', async interaction => {
             ephemeral: true
           });
         }
+
         if (!ROBLOX_GROUP_ID) {
           return interaction.reply({
             content: '⚠️ ROBLOX_GROUP_ID not configured.',
             ephemeral: true
           });
         }
+
         await interaction.deferReply();
+
         try {
           const count = await fetchRobloxMemberCount(ROBLOX_GROUP_ID);
           const embed = new EmbedBuilder()
@@ -1338,22 +1368,25 @@ client.on('interactionCreate', async interaction => {
             .setThumbnail(THUMBNAIL_URL)
             .setFooter({ text: 'CityMart Services' })
             .setTimestamp();
+
           return interaction.editReply({
             embeds: [embed],
             components: [createLinkRow(COMMUNITY_URL, 'Open Roblox Community')]
           });
-        } catch (e) {
+        } catch {
           return interaction.editReply('❌ Could not fetch the member count right now. Try again later.');
         }
       }
 
       case 'citycraft': {
         const { embed, row } = buildCityCraftEmbed();
-        return interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+        return interaction.reply({
+          embeds: [embed],
+          components: [row],
+          ephemeral: true
+        });
       }
 
-
-      // easyPOS activity
       case 'activity': {
         const username = interaction.options.getString('username', true);
 
@@ -1364,16 +1397,14 @@ client.on('interactionCreate', async interaction => {
           });
         }
 
-        await interaction.deferReply(); // public
+        await interaction.deferReply();
 
         try {
-          // 1) Resolve username -> Roblox userId
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
           }
 
-          // 2) Fetch Roblox profile + avatar + easyPOS activity in parallel
           const [info, avatarUrl, activity] = await Promise.all([
             robloxUserInfo(userId),
             robloxAvatarThumb(userId),
@@ -1387,8 +1418,8 @@ client.on('interactionCreate', async interaction => {
             );
           }
 
-          const a  = activity.data;
-          const pt = a.playtime  || {};
+          const a = activity.data;
+          const pt = a.playtime || {};
           const msg = a.messages || {};
           const pf = pt.formatted || {};
 
@@ -1397,7 +1428,7 @@ client.on('interactionCreate', async interaction => {
           const playtimeLines = [];
           if (pf.total) playtimeLines.push(`Total: **${pf.total}**`);
           if (pf.month) playtimeLines.push(`This month: **${pf.month}**`);
-          if (pf.week)  playtimeLines.push(`This week: **${pf.week}**`);
+          if (pf.week) playtimeLines.push(`This week: **${pf.week}**`);
           if (typeof pt.position === 'number') {
             playtimeLines.push(`Leaderboard position: **#${pt.position}**`);
           }
@@ -1405,7 +1436,7 @@ client.on('interactionCreate', async interaction => {
           const messageLines = [];
           if (typeof msg.total === 'number') messageLines.push(`Total: **${msg.total.toLocaleString()}**`);
           if (typeof msg.month === 'number') messageLines.push(`This month: **${msg.month.toLocaleString()}**`);
-          if (typeof msg.week === 'number')  messageLines.push(`This week: **${msg.week.toLocaleString()}**`);
+          if (typeof msg.week === 'number') messageLines.push(`This week: **${msg.week.toLocaleString()}**`);
           if (typeof msg.position === 'number') {
             messageLines.push(`Leaderboard position: **#${msg.position}**`);
           }
@@ -1438,7 +1469,6 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
-      // easyPOS donations — single user
       case 'donations': {
         const username = interaction.options.getString('username', true);
 
@@ -1449,19 +1479,17 @@ client.on('interactionCreate', async interaction => {
           });
         }
 
-        await interaction.deferReply(); // public
+        await interaction.deferReply();
 
         try {
-          // 1) Resolve username -> Roblox userId
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
           }
 
-          // 2) Fetch Roblox info + easyPOS donations in parallel
           const [info, donations] = await Promise.all([
             robloxUserInfo(userId),
-            fetchEasyPosDonations(userId) // should return { success, error?, data? }
+            fetchEasyPosDonations(userId)
           ]);
 
           if (!donations || donations.success === false || !donations.data) {
@@ -1490,7 +1518,6 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
-      // easyPOS donations — leaderboard
       case 'donationsleaderboard': {
         if (!EASYPOS_DONATIONS_TOKEN) {
           return interaction.reply({
@@ -1499,11 +1526,10 @@ client.on('interactionCreate', async interaction => {
           });
         }
 
-        await interaction.deferReply(); // public
+        await interaction.deferReply();
 
         try {
-          const leaderboard = await fetchEasyPosDonationsLeaderboard(); 
-          // expected: { success, error?, data?: { donations: [...] } }
+          const leaderboard = await fetchEasyPosDonationsLeaderboard();
 
           if (!leaderboard || leaderboard.success === false || !leaderboard.data) {
             const errText = leaderboard?.error || 'Unknown error from easyPOS.';
@@ -1520,8 +1546,7 @@ client.on('interactionCreate', async interaction => {
             return interaction.editReply('No donations found on this key yet.');
           }
 
-          // Resolve Roblox display names for each userId
-          const resolved = await Promise.all(entries.map(async (entry) => {
+          const resolved = await Promise.all(entries.map(async entry => {
             const numericId = Number(entry.userId);
             try {
               const info = await robloxUserInfo(numericId);
@@ -1545,6 +1570,7 @@ client.on('interactionCreate', async interaction => {
             const tag = r.username
               ? `[@${r.username}](https://www.roblox.com/users/${r.userId}/profile)`
               : `User ID: ${r.userId}`;
+
             return `**#${idx + 1}** — ${r.name} (${tag}) — **R$ ${r.amount.toLocaleString()}**`;
           });
 
@@ -1561,7 +1587,7 @@ client.on('interactionCreate', async interaction => {
           return interaction.editReply('❌ Something went wrong fetching the donations leaderboard. Try again later.');
         }
       }
-      // easyPOS ranking
+
       case 'ranking': {
         if (!interaction.guild) {
           return interaction.reply({
@@ -1587,10 +1613,9 @@ client.on('interactionCreate', async interaction => {
         const sub = interaction.options.getSubcommand();
         const username = interaction.options.getString('username', true);
 
-        await interaction.deferReply({ ephemeral: true }); // keep rank actions private
+        await interaction.deferReply({ ephemeral: true });
 
         try {
-          // Resolve Roblox username → userId
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
@@ -1625,7 +1650,7 @@ client.on('interactionCreate', async interaction => {
                   `User: **${display}** (ID: \`${userId}\`)`,
                   `New rank: **${newRank}**`,
                   '',
-                  `Handled via easyPOS ranking for CityMart.`
+                  'Handled via easyPOS ranking for CityMart.'
                 ].join('\n')
               )
               .setTimestamp();
@@ -1656,7 +1681,7 @@ client.on('interactionCreate', async interaction => {
                   `User: **${display}** (ID: \`${userId}\`)`,
                   `New rank: **${newRank}**`,
                   '',
-                  `Handled via easyPOS ranking for CityMart.`
+                  'Handled via easyPOS ranking for CityMart.'
                 ].join('\n')
               )
               .setTimestamp();
@@ -1664,7 +1689,6 @@ client.on('interactionCreate', async interaction => {
             return interaction.editReply({ embeds: [embed] });
           }
 
-          // Just in case a subcommand slips through
           return interaction.editReply('Unknown /ranking subcommand.');
         } catch (err) {
           console.error('ranking/easyPOS error:', err);
@@ -1682,7 +1706,6 @@ client.on('interactionCreate', async interaction => {
 
         const sub = interaction.options.getSubcommand();
 
-        // Owner-only for management subcommands (start/end/reroll/removeentrant), but NOT for "entries"
         if (['start', 'end', 'reroll', 'removeentrant'].includes(sub) &&
             interaction.guild.ownerId !== user.id) {
           return interaction.reply({
@@ -1703,7 +1726,7 @@ client.on('interactionCreate', async interaction => {
             });
           }
 
-          const endTs = Math.floor(endAt / 1000); // Unix seconds
+          const endTs = Math.floor(endAt / 1000);
 
           const embed = new EmbedBuilder()
             .setTitle('🎁 CityMart Giveaway')
@@ -1749,6 +1772,7 @@ client.on('interactionCreate', async interaction => {
             ended: false,
             winnerId: null
           });
+
           saveGiveawaysToDisk();
           break;
         }
@@ -1756,18 +1780,21 @@ client.on('interactionCreate', async interaction => {
         if (sub === 'end') {
           const messageId = interaction.options.getString('message_id', true);
           const g = giveaways.get(messageId);
+
           if (!g) {
             return interaction.reply({
               content: 'Could not find that giveaway. Make sure the message ID is correct.',
               ephemeral: true
             });
           }
+
           if (g.ended) {
             return interaction.reply({
               content: 'That giveaway has already ended.',
               ephemeral: true
             });
           }
+
           await interaction.reply({ content: 'Ending giveaway...', ephemeral: true });
           await endGiveaway(messageId, g, { reroll: false });
           g.ended = true;
@@ -1778,18 +1805,21 @@ client.on('interactionCreate', async interaction => {
         if (sub === 'reroll') {
           const messageId = interaction.options.getString('message_id', true);
           const g = giveaways.get(messageId);
+
           if (!g) {
             return interaction.reply({
               content: 'Could not find that giveaway. Make sure the message ID is correct.',
               ephemeral: true
             });
           }
+
           if (!g.ended) {
             return interaction.reply({
               content: 'You can only reroll a giveaway that has already ended.',
               ephemeral: true
             });
           }
+
           if (!g.entrants || g.entrants.length === 0) {
             return interaction.reply({
               content: 'There are no entrants to reroll from.',
@@ -1805,6 +1835,7 @@ client.on('interactionCreate', async interaction => {
         if (sub === 'entries') {
           const messageId = interaction.options.getString('message_id', true);
           const g = giveaways.get(messageId);
+
           if (!g) {
             return interaction.reply({
               content: 'Could not find that giveaway. Make sure the message ID is correct.',
@@ -1820,13 +1851,10 @@ client.on('interactionCreate', async interaction => {
             });
           }
 
-          // Show up to 25 entrants in a single message
           const maxToShow = 25;
           const slice = entrants.slice(0, maxToShow);
 
-          const lines = slice.map((userId, idx) => {
-            return `**#${idx + 1}** — <@${userId}>`;
-          });
+          const lines = slice.map((userId, idx) => `**#${idx + 1}** — <@${userId}>`);
 
           if (entrants.length > maxToShow) {
             lines.push(`…and **${entrants.length - maxToShow}** more entrants.`);
@@ -1849,6 +1877,7 @@ client.on('interactionCreate', async interaction => {
           const targetUser = interaction.options.getUser('user', true);
 
           const g = giveaways.get(messageId);
+
           if (!g) {
             return interaction.reply({
               content: '❌ I couldn’t find a giveaway with that message ID.',
@@ -1884,12 +1913,10 @@ client.on('interactionCreate', async interaction => {
         break;
       }
 
-      // hallAI bridge
       case 'ask': {
         const prompt = interaction.options.getString('prompt', true);
-
-        // /ask burst limit per conversation
         const key = askKey(guildId, channelId, user.id);
+
         if (!allowAsk(key)) {
           return interaction.reply({
             content: '🚦 Rate limit: max 5 questions per minute for this conversation. Please try again in a bit.',
@@ -1897,12 +1924,14 @@ client.on('interactionCreate', async interaction => {
           });
         }
 
-        await interaction.deferReply(); // show "thinking…"
+        await interaction.deferReply();
 
-        // Build conversation context
         const history = getHistory(key);
         const messages = [
-          { role: 'system', content: "You are hallAI, a retro terminal AI assistant built by Dave Van Cauwenberghe and launched on Thursday, 7 August 2025. Be helpful, nerdy, concise with a touch of sensitivity and witty humor. Use markdown where useful. You're running on gpt-4.1-nano" },
+          {
+            role: 'system',
+            content: "You are hallAI, a retro terminal AI assistant built by Dave Van Cauwenberghe and launched on Thursday, 7 August 2025. Be helpful, nerdy, concise with a touch of sensitivity and witty humor. Use markdown where useful. You're running on gpt-4.1-nano"
+          },
           ...history,
           { role: 'user', content: prompt }
         ];
@@ -1912,20 +1941,18 @@ client.on('interactionCreate', async interaction => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              prompt,           // for backward compatibility
-              identifier: key,  // worker can use this if desired
-              messages          // optional; worker can ignore
+              prompt,
+              identifier: key,
+              messages
             })
           });
 
           if (!res.ok) throw new Error(`Worker returned ${res.status}`);
-          const text = await res.text();
 
-          // Save this turn locally
+          const text = await res.text();
           pushTurn(key, prompt, text);
 
-          // Discord 2k char safety
-          const reply = text.length > 2000 ? text.slice(0, 1990) + '…' : text;
+          const reply = text.length > 2000 ? `${text.slice(0, 1990)}…` : text;
           return interaction.editReply(reply);
         } catch (err) {
           console.error('ask → hallAI error:', err);
@@ -1933,41 +1960,57 @@ client.on('interactionCreate', async interaction => {
         }
       }
 
-      // /memberlookup
       case 'memberlookup': {
         const username = interaction.options.getString('username', true);
         await interaction.deferReply();
+
         try {
           const userId = await robloxUsernameToId(username);
           if (!userId) {
             return interaction.editReply(`Couldn't find a Roblox user named **${username}**.`);
           }
+
           const [info, avatarUrl, role] = await Promise.all([
             robloxUserInfo(userId),
             robloxAvatarThumb(userId),
             ROBLOX_GROUP_ID ? robloxGroupRole(userId, ROBLOX_GROUP_ID) : Promise.resolve(null)
           ]);
+
           info.citymartRole = role;
           const { embed, components } = buildMemberLookupEmbed(info, avatarUrl);
+
           return interaction.editReply({ embeds: [embed], components });
         } catch (e) {
           console.error('memberlookup error:', e);
           return interaction.editReply('⚠️ Something went wrong fetching that user.');
         }
       }
+
+      default:
+        return interaction.reply({
+          content: '⚠️ Unknown command.',
+          ephemeral: true
+        });
     }
   } catch (err) {
     console.error('Error in interactionCreate:', err);
-    if (interaction && !interaction.replied) {
-      interaction.reply({
-        content: '⚠️ An internal error occurred.',
-        ephemeral: true
-      }).catch(() => {});
+
+    if (!interaction || !interaction.isRepliable()) return;
+
+    const payload = {
+      content: '⚠️ An internal error occurred.',
+      ephemeral: true
+    };
+
+    if (interaction.deferred || interaction.replied) {
+      interaction.editReply(payload).catch(() => {});
+    } else {
+      interaction.reply(payload).catch(() => {});
     }
   }
 });
 
-// ---------------------- Button Interactions (Giveaways) ----------------------
+// ---------------------- Button interactions (Giveaways) ----------------------
 client.on('interactionCreate', async interaction => {
   try {
     if (!interaction.isButton()) return;
@@ -1979,6 +2022,7 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.customId === 'giveaway_entries') {
       const msg = interaction.message;
+
       if (!msg || !msg.id) {
         return interaction.reply({
           content: 'This giveaway is no longer valid.',
@@ -1987,6 +2031,7 @@ client.on('interactionCreate', async interaction => {
       }
 
       const g = giveaways.get(msg.id);
+
       if (!g) {
         return interaction.reply({
           content: 'Could not find this giveaway. It may no longer be active.',
@@ -2021,10 +2066,9 @@ client.on('interactionCreate', async interaction => {
 
       return interaction.reply({
         embeds: [embed],
-        ephemeral: true // change to false if you want it public
+        ephemeral: true
       });
     }
-
   } catch (err) {
     console.error('Button interaction error:', err);
   }
@@ -2033,10 +2077,7 @@ client.on('interactionCreate', async interaction => {
 // ---------------------- Button / Modal: CityCraft whitelist request ----------------------
 client.on('interactionCreate', async interaction => {
   try {
-    // Button: open the modal
     if (interaction.isButton() && interaction.customId === 'citycraft_whitelist_request') {
-      const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
-
       const modal = new ModalBuilder()
         .setCustomId('citycraft_whitelist_modal')
         .setTitle('CityCraft — Whitelist Request');
@@ -2056,7 +2097,6 @@ client.on('interactionCreate', async interaction => {
       return interaction.showModal(modal);
     }
 
-    // Modal submit: DM Dave
     if (interaction.isModalSubmit() && interaction.customId === 'citycraft_whitelist_modal') {
       const requestedName = interaction.fields.getTextInputValue('citycraft_username')?.trim();
 
@@ -2067,7 +2107,6 @@ client.on('interactionCreate', async interaction => {
         });
       }
 
-      // A nice “professional” DM embed for you
       const requestEmbed = new EmbedBuilder()
         .setColor(0x5865F2)
         .setTitle('📥 CityCraft Whitelist Request')
@@ -2081,22 +2120,18 @@ client.on('interactionCreate', async interaction => {
         .setFooter({ text: `Server: ${CITYCRAFT_ADDRESS}` })
         .setTimestamp();
 
-      // DM Dave (you)
       try {
         const owner = await client.users.fetch(CITYCRAFT_OWNER_USER_ID);
         await owner.send({ embeds: [requestEmbed] });
       } catch (e) {
         console.error('Failed to DM CityCraft whitelist request to owner:', e);
-        // Still tell the user we got it, but mention DM failure nicely.
         return interaction.reply({
           content:
-            '⚠️ I tried to forward your request, but I couldn’t DM the server owner. ' +
-            'Please contact staff in the server to request access.',
+            '⚠️ I tried to forward your request, but I couldn’t DM the server owner. Please contact staff in the server to request access.',
           ephemeral: true
         });
       }
 
-      // Confirm to the user (ephemeral)
       const confirmEmbed = new EmbedBuilder()
         .setColor(0x57F287)
         .setTitle('✅ Request sent!')
@@ -2114,7 +2149,11 @@ client.on('interactionCreate', async interaction => {
     }
   } catch (err) {
     console.error('CityCraft button/modal error:', err);
+
     if (interaction.isRepliable()) {
+      if (interaction.deferred || interaction.replied) {
+        return interaction.editReply({ content: '❌ Something went wrong. Try again later.' }).catch(() => {});
+      }
       return interaction.reply({ content: '❌ Something went wrong. Try again later.', ephemeral: true }).catch(() => {});
     }
   }
@@ -2124,14 +2163,17 @@ client.login(DISCORD_TOKEN);
 
 // ---------------------- Tiny landing page server ----------------------
 const PORT = process.env.PORT || 8080;
+
 http
   .createServer((req, res) => {
     const filePath = path.join(__dirname, 'public', 'index.html');
+
     fs.readFile(filePath, (err, html) => {
       if (err) {
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         return res.end('Error loading page');
       }
+
       res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
       res.end(html);
     });
