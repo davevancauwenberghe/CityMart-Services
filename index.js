@@ -171,14 +171,15 @@ function allowMembersCheck(userId) {
 
 // Periodic cleanup of stale maps
 setInterval(() => {
-  const cutoff = Date.now() - 60 * 60 * 1000;
+  const now = Date.now();
+  const cutoff = now - 60 * 60 * 1000;
 
   for (const [uid, ts] of userCooldowns) {
     if (ts < cutoff) userCooldowns.delete(uid);
   }
 
   for (const [key, stamps] of askBuckets) {
-    const pruned = stamps.filter(t => Date.now() - t < ASK_WINDOW_MS);
+    const pruned = stamps.filter(t => now - t < ASK_WINDOW_MS);
     if (pruned.length) askBuckets.set(key, pruned);
     else askBuckets.delete(key);
   }
@@ -238,6 +239,10 @@ const CITYMART_EMOJI = /^<a?:\w+:\d+>$/.test(CITYMART_EMOJI_RAW) ? CITYMART_EMOJ
 const LAMP_EMOJI = /^<a?:\w+:\d+>$/.test(LAMP_EMOJI_RAW) ? LAMP_EMOJI_RAW : '💡';
 
 const REACTION_KEYWORDS = ['shopping', 'mart', 'cart', 'shop', 'store', 'lamp', 'citymart'];
+const MEMBER_LOOKUP_REGEX = /\bmemberlookup\s+([A-Za-z0-9_]{3,20})/i;
+const PING_REGEX = /\bping\b/i;
+const MEMBER_COUNT_REGEX = /\b(members?|communitycount)\b/i;
+const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
 
 const escapeForRegex = require('./utils/escapeForRegex');
 
@@ -248,6 +253,11 @@ const CITYCRAFT_OWNER_USER_ID = '651525636351066182';
 // ---------------------- Small cache (5 min TTL) ----------------------
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map();
+const ROBLOX_HEADERS = { 'User-Agent': OUTBOUND_UA };
+const JSON_HEADERS = {
+  'Content-Type': 'application/json',
+  'User-Agent': OUTBOUND_UA
+};
 
 function cacheGet(key) {
   const hit = cache.get(key);
@@ -261,6 +271,17 @@ function cacheGet(key) {
 
 function cacheSet(key, value, ttl = CACHE_TTL_MS) {
   cache.set(key, { value, expires: Date.now() + ttl });
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_FETCH_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ---------------------- Helpers ----------------------
@@ -293,10 +314,7 @@ async function robloxUsernameToId(username) {
 
   const res = await fetch('https://users.roblox.com/v1/usernames/users', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       usernames: [username],
       excludeBannedUsers: false
@@ -317,7 +335,7 @@ async function robloxUserInfo(userId) {
   if (cached !== null) return cached;
 
   const res = await fetch(`https://users.roblox.com/v1/users/${userId}`, {
-    headers: { 'User-Agent': OUTBOUND_UA }
+    headers: ROBLOX_HEADERS
   });
 
   if (!res.ok) throw new Error(`Roblox user info failed (${res.status})`);
@@ -334,7 +352,7 @@ async function robloxAvatarThumb(userId) {
 
   const url = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=true`;
   const res = await fetch(url, {
-    headers: { 'User-Agent': OUTBOUND_UA }
+    headers: ROBLOX_HEADERS
   });
 
   if (!res.ok) {
@@ -355,7 +373,7 @@ async function robloxGroupRole(userId, groupId) {
 
   const url = `https://groups.roblox.com/v1/users/${userId}/groups/roles`;
   const res = await fetch(url, {
-    headers: { 'User-Agent': OUTBOUND_UA }
+    headers: ROBLOX_HEADERS
   });
 
   if (!res.ok) {
@@ -437,10 +455,7 @@ async function fetchEasyPosActivity(userId) {
 
   const res = await fetch(`${EASYPOS_BASE_URL}/activity/data`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       token: EASYPOS_TOKEN,
       userId: Number(userId)
@@ -459,10 +474,7 @@ async function fetchEasyPosDonations(userId) {
 
   const res = await fetch(`${EASYPOS_BASE_URL}/donations/lookup`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       token: EASYPOS_DONATIONS_TOKEN,
       userId: Number(userId)
@@ -484,10 +496,7 @@ async function fetchEasyPosDonationsLeaderboard() {
 
   const res = await fetch(`${EASYPOS_BASE_URL}/donations/leaderboard`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify({
       token: EASYPOS_DONATIONS_TOKEN
     })
@@ -518,10 +527,7 @@ async function fetchEasyPosPromote(userId, modId, scaleCode) {
 
   const res = await fetch(`${EASYPOS_BASE_URL}/ranking/promote`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify(payload)
   });
 
@@ -546,10 +552,7 @@ async function fetchEasyPosDemote(userId, modId) {
 
   const res = await fetch(`${EASYPOS_BASE_URL}/ranking/demote`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': OUTBOUND_UA
-    },
+    headers: JSON_HEADERS,
     body: JSON.stringify(payload)
   });
 
@@ -714,28 +717,17 @@ function updatePresence() {
 }
 
 async function fetchRobloxMemberCount(groupId) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 10000);
+  const res = await fetchWithTimeout(`https://groups.roblox.com/v1/groups/${groupId}`, {
+    headers: ROBLOX_HEADERS
+  });
 
-  try {
-    const res = await fetch(`https://groups.roblox.com/v1/groups/${groupId}`, {
-      signal: ctrl.signal,
-      headers: { 'User-Agent': OUTBOUND_UA }
-    });
+  if (!res.ok) throw new Error(`Roblox API HTTP ${res.status}`);
 
-    clearTimeout(t);
+  const data = await res.json();
+  const count = Number(data?.memberCount);
+  if (!Number.isFinite(count)) throw new Error('memberCount not found');
 
-    if (!res.ok) throw new Error(`Roblox API HTTP ${res.status}`);
-
-    const data = await res.json();
-    const count = Number(data?.memberCount);
-    if (!Number.isFinite(count)) throw new Error('memberCount not found');
-
-    return count;
-  } catch (e) {
-    clearTimeout(t);
-    throw e;
-  }
+  return count;
 }
 
 async function pollRobloxMembers() {
@@ -1108,8 +1100,10 @@ client.on('messageCreate', async message => {
       });
     }
 
-    if (message.mentions.has(client.user)) {
-      const mlMatch = message.content.match(/\bmemberlookup\s+([A-Za-z0-9_]{3,20})/i);
+    const mentionsBot = message.mentions.has(client.user);
+
+    if (mentionsBot) {
+      const mlMatch = message.content.match(MEMBER_LOOKUP_REGEX);
       if (mlMatch) {
         const username = mlMatch[1];
 
@@ -1140,9 +1134,9 @@ client.on('messageCreate', async message => {
       }
     }
 
-    if (!message.mentions.has(client.user)) return;
+    if (!mentionsBot) return;
 
-    if (/\bping\b/i.test(msg)) {
+    if (PING_REGEX.test(msg)) {
       const latency = Date.now() - message.createdTimestamp;
       const pingEmbed = new EmbedBuilder()
         .setTitle('🏓 Pong!')
@@ -1158,7 +1152,7 @@ client.on('messageCreate', async message => {
       });
     }
 
-    if (/\b(members?|communitycount)\b/i.test(msg)) {
+    if (MEMBER_COUNT_REGEX.test(msg)) {
       if (!allowMembersCheck(message.author.id)) {
         return message.reply('⏳ Please wait a bit before checking member counts again.');
       }
@@ -2163,20 +2157,28 @@ client.login(DISCORD_TOKEN);
 
 // ---------------------- Tiny landing page server ----------------------
 const PORT = process.env.PORT || 8080;
+const PUBLIC_INDEX_PATH = path.join(__dirname, 'public', 'index.html');
 
 http
   .createServer((req, res) => {
-    const filePath = path.join(__dirname, 'public', 'index.html');
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { Allow: 'GET, HEAD' });
+      return res.end();
+    }
 
-    fs.readFile(filePath, (err, html) => {
-      if (err) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        return res.end('Error loading page');
-      }
-
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
-      res.end(html);
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=UTF-8',
+      'Cache-Control': 'public, max-age=300'
     });
+
+    if (req.method === 'HEAD') return res.end();
+
+    return fs.createReadStream(PUBLIC_INDEX_PATH)
+      .on('error', () => {
+        if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading page');
+      })
+      .pipe(res);
   })
   .listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 HTTP server listening on port ${PORT}`);
