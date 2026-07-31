@@ -19,6 +19,14 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Static embed templates are created when the process starts. Always clone them
+// immediately before sending so Discord receives the current instant rather than
+// the bot's start time. Discord renders this instant in each viewer's locale;
+// CityMart's canonical timezone is Europe/Brussels.
+function withCurrentTimestamp(embed) {
+  return new EmbedBuilder(embed.toJSON()).setTimestamp(new Date());
+}
+
 // ---------------------- Process-level safety logging ----------------------
 process.on('unhandledRejection', err => {
   console.error('Unhandled promise rejection:', err);
@@ -1096,7 +1104,7 @@ client.on('messageCreate', async message => {
     if (LAMP_TRIGGER && LAMP_TRIGGER.regex.test(msg)) {
       return message.channel.send({
         content: `${message.author}`,
-        embeds: [LAMP_TRIGGER.embed]
+        embeds: [withCurrentTimestamp(LAMP_TRIGGER.embed)]
       });
     }
 
@@ -1196,7 +1204,7 @@ client.on('messageCreate', async message => {
 
         return message.channel.send({
           content: `${message.author}`,
-          embeds: [trigger.embed],
+          embeds: [withCurrentTimestamp(trigger.embed)],
           components
         });
       }
@@ -1204,7 +1212,7 @@ client.on('messageCreate', async message => {
 
     await message.channel.send({
       content: `${message.author}`,
-      embeds: [HELP_EMBED]
+      embeds: [withCurrentTimestamp(HELP_EMBED)]
     });
   } catch (err) {
     console.error('Error in guild messageCreate:', err);
@@ -1295,7 +1303,7 @@ client.on('interactionCreate', async interaction => {
 
     switch (commandName) {
       case 'keywords':
-        return interaction.reply({ embeds: [HELP_EMBED], ephemeral: false });
+        return interaction.reply({ embeds: [withCurrentTimestamp(HELP_EMBED)], ephemeral: false });
 
       case 'community':
       case 'experience':
@@ -1308,7 +1316,7 @@ client.on('interactionCreate', async interaction => {
 
         const opts = {
           content: `${user}`,
-          embeds: [trigger.embed],
+          embeds: [withCurrentTimestamp(trigger.embed)],
           ephemeral: false
         };
 

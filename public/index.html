@@ -29,7 +29,7 @@
                 <span class="status-dot" aria-hidden="true"></span>
                 Operational
               </span>
-              <span class="pill">v1.3.1</span>
+              <span class="pill">v1.4</span>
               <span class="pill pill-outline">Trusted by CityMart Group</span>
             </div>
 
@@ -96,20 +96,41 @@
               </div>
               <a class="btn" href="https://github.com/davevancauwenberghe/CityMart-Services/issues" target="_blank" rel="noopener noreferrer">Request a command</a>
             </div>
-            <div class="command-list">
-              <article class="command-card">
-                <div class="command-name">/keywords</div>
-                <p>Discover quick shortcuts to documents, forms, and CityMart resources without leaving Discord.</p>
+            <div class="command-explorer">
+              <div class="command-tabs" role="tablist" aria-label="Filter commands">
+                <button class="command-tab is-active" type="button" role="tab" aria-selected="true" data-filter="all">All</button>
+                <button class="command-tab" type="button" role="tab" aria-selected="false" data-filter="community">Community</button>
+                <button class="command-tab" type="button" role="tab" aria-selected="false" data-filter="tools">Tools</button>
+                <button class="command-tab" type="button" role="tab" aria-selected="false" data-filter="support">Support</button>
+              </div>
+              <label class="command-search">
+                <span class="sr-only">Search commands</span>
+                <input id="command-search" type="search" placeholder="Search commands…" autocomplete="off" />
+              </label>
+            </div>
+            <div class="command-list" id="command-list" aria-live="polite">
+              <article class="command-card" data-category="tools" data-search="keywords shortcuts resources">
+                <button class="command-copy" type="button" data-command="/keywords" aria-label="Copy /keywords command">Copy</button>
+                <div class="command-name">/keywords</div><p>Discover every shortcut and CityMart resource without leaving Discord.</p>
               </article>
-              <article class="command-card">
-                <div class="command-name">Ping @CityMart Services</div>
-                <p>Ask the bot for help in any channel and it responds instantly with the info you need.</p>
+              <article class="command-card" data-category="tools" data-search="ping latency status">
+                <button class="command-copy" type="button" data-command="/ping" aria-label="Copy /ping command">Copy</button>
+                <div class="command-name">/ping</div><p>Check the bot's current response time and service availability.</p>
               </article>
-              <article class="command-card">
-                <div class="command-name">Issue helper</div>
-                <p>Jump straight to GitHub issues, report bugs, and track progress from the same interface.</p>
+              <article class="command-card" data-category="community" data-search="community member count roblox">
+                <button class="command-copy" type="button" data-command="/communitycount" aria-label="Copy /communitycount command">Copy</button>
+                <div class="command-name">/communitycount</div><p>See the latest CityMart Roblox community member count.</p>
+              </article>
+              <article class="command-card" data-category="community" data-search="member lookup roblox profile">
+                <button class="command-copy" type="button" data-command="/memberlookup" aria-label="Copy /memberlookup command">Copy</button>
+                <div class="command-name">/memberlookup</div><p>Look up a Roblox profile and its CityMart role in seconds.</p>
+              </article>
+              <article class="command-card" data-category="support" data-search="support help ticket">
+                <button class="command-copy" type="button" data-command="/support" aria-label="Copy /support command">Copy</button>
+                <div class="command-name">/support</div><p>Find the right support channel whenever you need a hand.</p>
               </article>
             </div>
+            <p class="command-empty" id="command-empty" hidden>No matching commands yet. Try another search.</p>
           </section>
 
           <section class="policy-showcase" aria-label="Privacy and terms overview">
