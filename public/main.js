@@ -37,6 +37,48 @@ window.addEventListener('DOMContentLoaded', () => {
   updateTimestamp();
   setInterval(updateTimestamp, 1000);
 
+  // Interactive command explorer
+  const tabs = [...document.querySelectorAll('.command-tab')];
+  const commandCards = [...document.querySelectorAll('.command-card')];
+  const commandSearch = document.getElementById('command-search');
+  const commandEmpty = document.getElementById('command-empty');
+  let activeFilter = 'all';
+
+  function filterCommands() {
+    const query = commandSearch?.value.trim().toLowerCase() || '';
+    let visible = 0;
+    commandCards.forEach(card => {
+      const matchesCategory = activeFilter === 'all' || card.dataset.category === activeFilter;
+      const matchesQuery = !query || `${card.dataset.search} ${card.textContent}`.toLowerCase().includes(query);
+      card.hidden = !(matchesCategory && matchesQuery);
+      if (!card.hidden) visible += 1;
+    });
+    if (commandEmpty) commandEmpty.hidden = visible !== 0;
+  }
+
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    activeFilter = tab.dataset.filter;
+    tabs.forEach(item => {
+      const selected = item === tab;
+      item.classList.toggle('is-active', selected);
+      item.setAttribute('aria-selected', String(selected));
+    });
+    filterCommands();
+  }));
+  commandSearch?.addEventListener('input', filterCommands);
+
+  document.querySelectorAll('.command-copy').forEach(button => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.command);
+        button.textContent = 'Copied!';
+      } catch {
+        button.textContent = button.dataset.command;
+      }
+      setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+    });
+  });
+
   // Intro animation
   setTimeout(() => {
     if (spinner) spinner.style.display = 'none';
