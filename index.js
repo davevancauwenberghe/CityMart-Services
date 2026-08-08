@@ -253,10 +253,20 @@ const MEMBER_COUNT_REGEX = /\b(members?|communitycount)\b/i;
 const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
 
 const escapeForRegex = require('./utils/escapeForRegex');
+const { decodeTextureProperty, isMinecraftUsername } = require('./utils/mojang');
 
 // ---------------------- CityCraft ----------------------
 const CITYCRAFT_ADDRESS = 'citycraft.davevancauwenberghe.be';
 const CITYCRAFT_OWNER_USER_ID = '651525636351066182';
+
+// Mojang allows 200 requests per two minutes per IP. Stay below that upstream
+// ceiling and also constrain individual Discord users to prevent trolling.
+const MOJANG_USER_WINDOW_MS = 60_000;
+const MOJANG_USER_MAX = 3;
+const MOJANG_GLOBAL_WINDOW_MS = 120_000;
+const MOJANG_GLOBAL_MAX = 180;
+const mojangUserBuckets = new Map();
+let mojangGlobalBucket = [];
 
 // ---------------------- Small cache (5 min TTL) ----------------------
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -290,6 +300,88 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = DEFAULT_FETCH_TIM
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function takeMojangRateLimit(userId, requestCost = 2) {
+  const now = Date.now();
+  const userStamps = (mojangUserBuckets.get(userId) || [])
+    .filter(timestamp => now - timestamp < MOJANG_USER_WINDOW_MS);
+  mojangGlobalBucket = mojangGlobalBucket
+    .filter(timestamp => now - timestamp < MOJANG_GLOBAL_WINDOW_MS);
+
+  if (userStamps.length >= MOJANG_USER_MAX) return 'user';
+  if (mojangGlobalBucket.length + requestCost > MOJANG_GLOBAL_MAX) return 'global';
+
+  userStamps.push(now);
+  mojangUserBuckets.set(userId, userStamps);
+  for (let i = 0; i < requestCost; i += 1) mojangGlobalBucket.push(now);
+  return null;
+}
+
+async function fetchMojangJson(url) {
+  const response = await fetchWithTimeout(url, {
+    headers: { 'Accept': 'application/json', 'User-Agent': OUTBOUND_UA }
+  });
+  if (response.status === 204 || response.status === 404) return null;
+  if (response.status === 429) {
+    const error = new Error('Mojang rate limit reached');
+    error.code = 'MOJANG_RATE_LIMIT';
+    throw error;
+  }
+  if (!response.ok) throw new Error(`Mojang API returned HTTP ${response.status}`);
+  return response.json();
+}
+
+async function minecraftPlayerByUsername(username) {
+  const cacheKey = `minecraft:${username.toLowerCase()}`;
+  const cached = cacheGet(cacheKey);
+  if (cached !== null) return cached;
+
+  const lookup = await fetchMojangJson(
+    `https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(username)}`
+  );
+  if (!lookup?.id || !lookup?.name) return null;
+
+  const session = await fetchMojangJson(
+    `https://sessionserver.mojang.com/session/minecraft/profile/${encodeURIComponent(lookup.id)}`
+  );
+  const textureProperty = session?.properties?.find(property => property?.name === 'textures');
+  const textures = textureProperty?.value ? decodeTextureProperty(textureProperty.value) : {};
+  const player = {
+    name: lookup.name,
+    legacy: Boolean(lookup.legacy),
+    demo: Boolean(lookup.demo),
+    ...textures
+  };
+
+  cacheSet(cacheKey, player);
+  return player;
+}
+
+function buildMinecraftPlayerResponse(player) {
+  const embed = new EmbedBuilder()
+    .setColor(0x62B347)
+    .setTitle(`⛏️ Minecraft Player • ${player.name}`)
+    .setDescription('Minecraft Java profile information supplied by Mojang.')
+    .addFields(
+      { name: 'Username', value: `\`${player.name}\``, inline: true },
+      { name: 'Skin model', value: player.skinUrl ? player.model : 'Default skin', inline: true },
+      { name: 'Cape', value: player.capeUrl ? '✅ Equipped' : '❌ None', inline: true },
+      { name: 'Account type', value: player.demo ? 'Demo' : (player.legacy ? 'Legacy' : 'Standard'), inline: true }
+    )
+    .setThumbnail(THUMBNAIL_URL)
+    .setFooter({ text: 'CityMart Services • UUIDs are kept private' })
+    .setTimestamp();
+
+  if (player.skinUrl) embed.setImage(player.skinUrl);
+  const buttons = [];
+  if (player.skinUrl) buttons.push(new ButtonBuilder().setLabel('View Skin Texture').setEmoji('🧍').setStyle(ButtonStyle.Link).setURL(player.skinUrl));
+  if (player.capeUrl) buttons.push(new ButtonBuilder().setLabel('View Cape Texture').setEmoji('🦸').setStyle(ButtonStyle.Link).setURL(player.capeUrl));
+
+  return {
+    embed,
+    components: buttons.length ? [new ActionRowBuilder().addComponents(buttons)] : []
+  };
 }
 
 // ---------------------- Helpers ----------------------
@@ -701,6 +793,7 @@ const HELP_EMBED = new EmbedBuilder()
     { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
     { name: '🆘 Support', value: 'support\ndocumentation', inline: false },
     { name: '📖 Misc', value: 'lorebook\nlamp\nping\nask\ncommunitycount\nmemberlookup <username>', inline: false },
+    { name: '⛏️ Minecraft', value: '`/minecraft player username:<name>` — view a Java player’s skin, cape, and account details', inline: false },
     { name: '🔗 Dashboard', value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
@@ -1913,6 +2006,40 @@ client.on('interactionCreate', async interaction => {
         }
 
         break;
+      }
+
+      case 'minecraft': {
+        const username = interaction.options.getString('username', true).trim();
+        if (!isMinecraftUsername(username)) {
+          return interaction.reply({
+            content: '❌ Enter a valid Minecraft Java username (3–16 letters, numbers, or underscores). UUID queries are not available.',
+            ephemeral: true
+          });
+        }
+
+        const rateLimit = takeMojangRateLimit(user.id);
+        if (rateLimit) {
+          return interaction.reply({
+            content: rateLimit === 'user'
+              ? '🚦 You can look up 3 Minecraft players per minute. Please try again shortly.'
+              : '🚦 Minecraft lookups are busy right now. Please try again in a couple of minutes.',
+            ephemeral: true
+          });
+        }
+
+        await interaction.deferReply();
+        try {
+          const player = await minecraftPlayerByUsername(username);
+          if (!player) return interaction.editReply(`❌ No Minecraft Java player named **${username}** was found.`);
+
+          const { embed, components } = buildMinecraftPlayerResponse(player);
+          return interaction.editReply({ embeds: [embed], components });
+        } catch (error) {
+          console.error('minecraft player lookup error:', error);
+          return interaction.editReply(error?.code === 'MOJANG_RATE_LIMIT'
+            ? '🚦 Mojang is rate limiting requests. Please try again later.'
+            : '⚠️ Mojang could not be reached right now. Please try again later.');
+        }
       }
 
       case 'ask': {

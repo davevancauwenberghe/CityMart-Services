@@ -78,6 +78,25 @@ const commands = [
       .setDescription('CityCraft Minecraft server info + whitelist request')
   ),
 
+  noDM(
+    new SlashCommandBuilder()
+      .setName('minecraft')
+      .setDescription('Look up a Minecraft Java player')
+      .addSubcommand(sub =>
+        sub
+          .setName('player')
+          .setDescription("Show a Java player's skin, cape, and profile details")
+          .addStringOption(opt =>
+            opt
+              .setName('username')
+              .setDescription('Minecraft Java username (UUID lookup is not available)')
+              .setRequired(true)
+              .setMinLength(3)
+              .setMaxLength(16)
+          )
+      )
+  ),
+
   // hallAI bridge
   noDM(
     new SlashCommandBuilder()

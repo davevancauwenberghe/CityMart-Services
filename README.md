@@ -8,6 +8,17 @@
 
 A lightweight Discord gateway bot for the CityMart Group server. It listens for "@CityMart Services" and replies with rich embeds for commands like "community", "experience", "support", "lorebook", "keywords", "lamp", "ping", and "ask".
 
+## ⛏️ Minecraft / Mojang lookup
+
+Use `/minecraft player username:<name>` to display a Minecraft Java player's
+username, account type, skin model, skin texture, and cape. The command accepts
+usernames only: UUID input and UUID output are intentionally unavailable on the
+Discord frontend.
+
+Player lookups are cached for five minutes. Each Discord user may make three
+lookups per minute, and the bot reserves a global safety margin below Mojang's
+documented limit of 200 requests per two minutes.
+
 ## 🚀 Getting Started
 
 **Fork** this repository on GitHub, then follow the installation steps below.
