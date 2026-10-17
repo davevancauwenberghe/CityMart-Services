@@ -1,46 +1,30 @@
-name: "CodeQL Advanced"
-
+name: CodeQL
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
   schedule:
     - cron: '36 18 * * 2'
-
+permissions:
+  contents: read
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
       security-events: write
       contents: read
-      packages: read
       actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - language: javascript-typescript
-            build-mode: none
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js (ensures consistent runtime)
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+          node-version-file: .nvmrc
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         with:
-          languages: ${{ matrix.language }}
-          build-mode: ${{ matrix['build-mode'] }}
+          languages: javascript-typescript
+          build-mode: none
           queries: security-and-quality
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
         with:
-          category: "/language:${{ matrix.language }}"
+          category: /language:javascript-typescript

@@ -1,0 +1,47 @@
+name: Tests and container
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Build production container
+        run: docker build --tag citymart:test .
+      - name: Verify data permissions, legacy migration and health in the production container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker volume create citymart-ci-data
+          trap 'docker rm -f citymart-smoke >/dev/null 2>&1 || true; docker volume rm citymart-ci-data >/dev/null 2>&1 || true' EXIT
+          docker run --rm --entrypoint sh -v citymart-ci-data:/data citymart:test -c 'printf "{}" > /data/giveaways.json; chmod 600 /data/giveaways.json'
+          docker run --detach --name citymart-smoke -v citymart-ci-data:/data citymart:test node --input-type=module -e '
+            import { GiveawayStore } from "./dist/giveaways/store.js";
+            import { createHealthServer } from "./dist/health.js";
+            if (process.getuid() === 0) throw new Error("Bot must not run as root");
+            const store = new GiveawayStore("/data/giveaways.json");
+            await store.load();
+            createHealthServer(() => true).listen(8080, "0.0.0.0");'
+          for attempt in {1..15}; do
+            if docker exec citymart-smoke node -e 'fetch("http://127.0.0.1:8080/ready").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs citymart-smoke
+          exit 1

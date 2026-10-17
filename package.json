@@ -1,21 +1,31 @@
 {
   "name": "citymart-bot",
   "version": "1.4.0",
-  "description": "Discord bot for CityMart Group server",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "test": "node --test"
-  },
+  "private": true,
+  "description": "CityMart Services: slash commands, community services and giveaways",
+  "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "dev": "node --env-file-if-exists=.env --import tsx src/main.ts",
+    "commands": "node --env-file-if-exists=.env dist/register.js",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "format": "prettier --write src tests *.json *.md .github",
+    "format:check": "prettier --check src tests *.json *.md .github"
   },
   "dependencies": {
-    "discord.js": "14.25.1",
-    "dotenv": "16.4.5"
+    "discord.js": "14.27.0",
+    "luxon": "3.7.2"
   },
-  "overrides": {
-    "undici": "6.27.0",
-    "ws": "8.21.0"
+  "devDependencies": {
+    "@types/luxon": "3.7.6",
+    "@types/node": "24.19.2",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   }
 }

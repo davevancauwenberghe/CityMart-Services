@@ -1,20 +1,18 @@
-# 🤝 **Contributing**
+# Contributing
 
-We welcome your ideas and improvements! Here’s how to contribute using GitHub’s web interface:
+Create a branch or fork and open a pull request against `main`. Use Node.js 24 and a separate Discord development bot and guild. Never commit tokens, `.env` files or giveaway records.
 
-1. **Fork** this repository  
-   Click the **Fork** button in the top‑right of this page to create your own copy under your account.
+```bash
+npm ci
+npm run format
+npm run check
+npm test
+npm run build
+npm audit --omit=dev
+```
 
-2. **Create a branch**  
-   In your fork, click the **Branch** dropdown, type a name like `feature/my-feature`, and press Enter.
+Keep command definitions in `src/commands.ts`, interaction routing in `src/router.ts`, presentation in `src/ui.ts`, external APIs in `src/services`, and persistent giveaway behavior in `src/giveaways`. Use embeds for Discord messages and disable automatic mentions. Acknowledge interactions before network access; modal opening must be the initial response.
 
-3. **Edit files in‑browser**  
-   Navigate to the file you want to change, click the pencil icon ✏️, make your edits, then scroll down.
+Validate external data, bound request time and response size, and avoid logging raw responses or credentials. Do not automatically retry ranking mutations. Storage changes need a backwards-compatible migration, corruption handling and tests covering restart/failure behavior. Add focused regression tests for bugs and update the command guide and environment documentation when behavior changes.
 
-4. **Commit your changes**  
-   At the bottom of the editor, enter a concise commit message, ensure **“Create a new branch for this commit and start a pull request”** is selected, and click **Propose changes**.
-
-5. **Open a Pull Request**  
-   Review the diff on the next page, add any comments or screenshots, then click **Create pull request**.
-
-Please make sure your code follows the existing style, includes documentation for any new commands, and passes any tests or CI checks before merging. Thanks for helping improve CityMart Services!
+The CI image test uses temporary data, never a production volume. Do not run two bot replicas with the same token and storage.
