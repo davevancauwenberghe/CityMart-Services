@@ -1,0 +1,120 @@
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  MessageFlags,
+  escapeMarkdown,
+  type ChatInputCommandInteraction,
+  type ButtonInteraction,
+  type ModalSubmitInteraction,
+  type StringSelectMenuInteraction,
+  type InteractionReplyOptions,
+} from 'discord.js';
+import { VERSION } from './config.js';
+import { UserError } from './core.js';
+
+export const BRAND_ICON =
+  'https://storage.davevancauwenberghe.be/citymart/visuals/citymart_group_icon.png';
+export type Category =
+  'info' | 'success' | 'warning' | 'error' | 'roblox' | 'minecraft' | 'giveaway' | 'ai';
+const colors: Record<Category, number> = {
+  info: 0x5865f2,
+  success: 0x2ecc71,
+  warning: 0xf1c40f,
+  error: 0xe74c3c,
+  roblox: 0x00a2ff,
+  minecraft: 0x59a341,
+  giveaway: 0xeb459e,
+  ai: 0x9b59b6,
+};
+export const clip = (value: string, length: number) =>
+  value.length <= length ? value : value.slice(0, length - 1) + '…';
+export const literal = (value: string, length = 1000) =>
+  clip(
+    escapeMarkdown(value).replace(/@/g, '@\u200b').replace(/</g, '‹').replace(/>/g, '›'),
+    length,
+  );
+export function embed(title: string, description: string, category: Category = 'info') {
+  return new EmbedBuilder()
+    .setColor(colors[category])
+    .setTitle(clip(title, 256))
+    .setDescription(clip(description, 4096))
+    .setThumbnail(BRAND_ICON)
+    .setFooter({
+      text: `CityMart Services • ${category === 'ai' ? 'hallAI' : category} • v${VERSION}`,
+    })
+    .setTimestamp();
+}
+export function links(...items: [string, string][]) {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    items.map(([label, url]) =>
+      new ButtonBuilder().setLabel(label).setURL(url).setStyle(ButtonStyle.Link),
+    ),
+  );
+}
+export const message = (
+  embeds: EmbedBuilder[],
+  components: InteractionReplyOptions['components'] = [],
+) => ({ embeds, components, allowedMentions: { parse: [] as const } });
+export type ReplyInteraction =
+  | ChatInputCommandInteraction
+  | ButtonInteraction
+  | ModalSubmitInteraction
+  | StringSelectMenuInteraction;
+export async function defer(interaction: ReplyInteraction, privateReply = true) {
+  if (!interaction.deferred && !interaction.replied)
+    await interaction.deferReply(privateReply ? { flags: MessageFlags.Ephemeral } : {});
+}
+export async function respond(
+  interaction: ReplyInteraction,
+  embeds: EmbedBuilder[],
+  components: InteractionReplyOptions['components'] = [],
+  privateReply = true,
+) {
+  const payload = message(embeds, components);
+  if (interaction.deferred || interaction.replied) return interaction.editReply(payload);
+  return interaction.reply({
+    ...payload,
+    ...(privateReply ? { flags: MessageFlags.Ephemeral } : {}),
+  });
+}
+export async function respondError(interaction: ReplyInteraction, error: unknown) {
+  const description =
+    error instanceof UserError
+      ? error.message
+      : 'The request could not be completed. Please try again shortly. If it keeps happening, contact the server owner.';
+  await respond(interaction, [
+    embed(
+      'Unable to complete request',
+      description,
+      error instanceof UserError ? 'warning' : 'error',
+    ),
+  ]);
+}
+/** Keep fenced code readable across Discord's per-embed description limit. */
+export function splitAnswer(value: string, max = 3500): string[] {
+  if (!Number.isInteger(max) || max < 128 || max > 4096)
+    throw new RangeError('Invalid embed chunk size.');
+  const chunks: string[] = [];
+  let remaining = value;
+  let fence = '';
+  while (remaining.length) {
+    const prefix = fence ? `\`\`\`${fence}\n` : '';
+    const limit = max - prefix.length - 6;
+    let end = Math.min(limit, remaining.length);
+    if (end < remaining.length) {
+      const newline = remaining.lastIndexOf('\n', end);
+      if (newline > limit / 2) end = newline + 1;
+      if (/^[\uDC00-\uDFFF]$/.test(remaining[end] || '')) end--;
+    }
+    const part = remaining.slice(0, end);
+    for (const match of part.matchAll(/^```([^\n`]*)/gm)) {
+      const language = match[1]?.trim() || '';
+      fence = fence ? '' : /^[\w#+.-]{1,32}$/.test(language) ? language : 'text';
+    }
+    chunks.push(prefix + part + (fence ? '\n```' : ''));
+    remaining = remaining.slice(end);
+  }
+  return chunks.length ? chunks : ['No response was returned.'];
+}

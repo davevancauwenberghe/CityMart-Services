@@ -1,27 +1,24 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: "[Bug]"
+about: Report a problem in CityMart Services
+title: '[Bug] '
 labels: bug
 assignees: davevancauwenberghe
-
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**Bot version and deployment**
+For example: 1.4.0, Coolify Dockerfile deployment, Node 24.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**Command or control**
+Include the slash command/subcommand or button label. Remove personal data from inputs.
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Steps to reproduce**
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+1. Run the command or press the button.
+2. Describe what happened.
 
-**Additional context**
-Add any other context about the problem here.
+**Expected and actual behavior**
+Describe both. Add a screenshot of the embed when useful.
+
+**Safe diagnostics**
+Include the relevant event name and error/status code from runtime logs. Do not include tokens, environment dumps, private AI prompts or giveaway files.

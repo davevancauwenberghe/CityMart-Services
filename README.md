@@ -1,137 +1,129 @@
-# CityMart Services | Discord Bot
+# CityMart Services 1.4.0
 
-[![CodeQL Advanced](https://github.com/davevancauwenberghe/CityMart-Services/actions/workflows/codeql.yml/badge.svg)](https://github.com/davevancauwenberghe/CityMart-Services/actions/workflows/codeql.yml)
-![JavaScript](https://img.shields.io/badge/Language-JavaScript-yellow.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+A Discord bot for the CityMart community. Built with TypeScript, Node.js 24 LTS and discord.js 14. All Discord messages use consistent embeds. Ordinary messages do not trigger commands or reactions, and the bot does not read message content.
 
-A Discord gateway bot for the CityMart Group server, with slash commands and
-mention-based replies, Roblox community information, easyPOS integrations,
-giveaways, CityCraft requests and Minecraft Java player lookups.
+## Commands
 
-## Coolify deployment
+| Command                                                              | Purpose                                                             |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `/help`                                                              | Browse an interactive command guide.                                |
+| `/about`, `/ping`                                                    | Version, uptime and responsiveness.                                 |
+| `/support`                                                           | Find the support team.                                              |
+| `/community`, `/experience`, `/application`                          | CityMart Roblox links.                                              |
+| `/documentation`, `/lorebook`, `/lamp`                               | Guides, stories and a lamp.                                         |
+| `/user [member]`                                                     | Discord account, join date, roles and avatar.                       |
+| `/memberlookup username`                                             | Roblox profile and CityMart community role.                         |
+| `/communitycount`                                                    | Current Roblox community size.                                      |
+| `/activity username`                                                 | easyPOS playtime, messages and positions.                           |
+| `/donations username`, `/donationsleaderboard`                       | Donation totals and top ten donors.                                 |
+| `/minecraft player username`                                         | Minecraft Java profile, skin and cape; no UUID input or output.     |
+| `/ask prompt [private] [reset]`                                      | hallAI with the original question and a readable, paginated answer. |
+| `/citycraft info`, `/citycraft request`                              | Server details and a private whitelist request form.                |
+| `/giveaway list`, `/giveaway entries message_id`                     | Find giveaways and browse participants.                             |
+| `/giveaway start prize [duration] [end]`                             | Owner: start a giveaway in the current channel.                     |
+| `/giveaway end message_id`                                           | Owner: draw early or retry an interrupted result delivery.          |
+| `/giveaway reroll message_id`                                        | Owner: choose a new winner, excluding previous winners.             |
+| `/giveaway removeentrant message_id user`                            | Owner: remove an entrant before the draw.                           |
+| `/ranking promote username [scale_code]`, `/ranking demote username` | Owner: change a Roblox user's CityMart rank.                        |
 
-Connect this GitHub repository to a Coolify application and configure:
+Use exactly one giveaway timing option: `duration:2h`, `duration:7d`, or `end:2026-12-20 18:00`. Dates use `TIME_ZONE` (Europe/Brussels by default); ambiguous or skipped daylight-saving times are rejected. Durations run for the requested elapsed time. Giveaways may last between one minute and 90 days. Existing giveaway buttons remain compatible.
 
-| Setting | Value |
-| --- | --- |
-| Branch | `main` |
-| Build pack / Build strategy | Dockerfile |
-| Base Directory | `/` |
-| Dockerfile Location | `/Dockerfile` |
-| Ports Exposes | `8080` |
-| Port Mappings | Empty |
-| Domains | Empty |
+Administrative actions are restricted to the configured Discord server's owner. Use Discord **Server Settings → Integrations → CityMart Services** to restrict command availability further; this does not grant non-owners ranking or giveaway management rights. Participation requires the configured minimum role or a higher role; a missing configured role blocks entries rather than allowing everyone. Eligibility is checked when joining. Rerolls use the saved entrants, so the owner should remove ineligible entrants before ending a giveaway.
 
-The bot connects outward to Discord. Its HTTP listener is used only for internal
-health monitoring; the public landing page, assets, privacy and terms pages have
-been removed. `BOT_URL` is no longer read and can be removed from application
-variables. `WORKER_URL` is still used for `/ask` and should retain the address of
-the existing hallAI worker unless that service is also being moved.
+`/ask` defaults to a public answer. Set `private:true` to keep both the answer and its continuations visible only to you. Prompts and up to eight recent conversation turns are sent to the configured hallAI worker. Public and private conversations use separate context, scoped to your account and channel. Context expires after 30 minutes and is held only in memory; `reset:true` starts a fresh conversation. Do not send secrets to the AI. The worker's own retention policy is outside this bot.
 
-### Environment variables
+## Upgrade the existing Coolify application
 
-Add variables under the application's **Environment Variables**, in the
-production section. Enable runtime availability and disable build-time
-availability. Save tokens in a password manager and keep them out of GitHub.
+1. Back up the existing `/data` volume before upgrading. Keep it mounted at `/data`.
+2. Merge the reviewed PR and deploy `main` using the **Dockerfile** build pack. Keep only one production instance, with **Consistent name (no rolling updates)** enabled. Avoid running the Fly copy or PR previews with the production bot token.
+3. Keep your existing runtime environment variables. No new secret is required. `CLIENT_ID` is checked when set, or derived from the logged-in bot when absent. Do not override the new Docker start command with `node index.js`.
+4. Ensure the Discord installation includes `bot` and `applications.commands`. The bot registers the current guild command list automatically at startup, replacing `/keywords` with `/help`.
+5. **Message Content Intent, Server Members Intent and Presence Intent are unnecessary and can be disabled** in the Developer Portal. The bot uses only the Guilds gateway intent and fetches individual members when needed.
+6. Read Runtime Logs for `CityMart Services v1.4.0 ready as ... Slash commands registered.` Then check `/help`, `/user`, `/ask`, and your enabled integrations. Create a small test giveaway, enter it, redeploy, and confirm the saved entry and eventual result.
 
-| Variable | Purpose |
-| --- | --- |
-| `DISCORD_TOKEN` | Required Discord bot token. |
-| `GUILD_ID` | CityMart Discord server ID. |
-| `CLIENT_ID` | Discord application ID used by `deploy-commands.js`. |
-| `SUPPORT_CHANNEL_ID` | Support-channel links. |
-| `GENERAL_CHANNEL_ID` | Startup announcements. |
-| `COMMANDS_CHANNEL_ID` | Roblox member-tracker announcements. |
-| `ROBLOX_GROUP_ID` | Roblox community lookups and member counts. |
-| `GIVEAWAY_MIN_ROLE_ID` | Minimum Discord role for giveaway participation. |
-| `WORKER_URL` | Existing hallAI worker endpoint for `/ask`. |
-| `EASYPOS_TOKEN` | easyPOS activity integration. |
-| `EASYPOS_DONATIONS_TOKEN` | easyPOS donations and donation leaderboard. |
-| `EASYPOS_RANKING_TOKEN` | easyPOS promotion and demotion integration. |
-| `EASYPOS_RANKING_MOD_ID` | Moderator ID sent to easyPOS ranking. |
-| `USER_AGENT` | Optional outbound API user agent. |
-| `PORT` | Internal health port; defaults to `8080`. |
-| `NODE_ENV` | `production`; already set by the Docker image. |
+The Docker entrypoint repairs ownership of the bot's data directory and its two known data files, then runs Node as the container's unprivileged `node` user. No additional Linux account is needed on the VPS. It does not recursively change unrelated files. Custom volume layouts must allow UID 1000 to write `DATA_DIR`.
 
-The bot's existing Discord **Message Content Intent** must remain enabled for
-mention-based commands. Slash commands also require the `applications.commands`
-installation scope.
+### Coolify configuration
 
-### Persistent storage
+| Setting                       | Value           |
+| ----------------------------- | --------------- |
+| Branch                        | `main`          |
+| Build pack                    | Dockerfile      |
+| Base directory                | `/`             |
+| Dockerfile location           | `/Dockerfile`   |
+| Ports exposes                 | `8080`          |
+| Port mappings                 | Empty           |
+| Domains                       | Empty           |
+| Persistent storage type       | Volume Mount    |
+| Volume name                   | `citymart-data` |
+| Destination path              | `/data`         |
+| Add suffix for PR deployments | Enabled         |
 
-For a fresh installation, open **Persistent Storage > Add > Volume Mount**:
+The bot connects outward to Discord; it needs no publicly accessible HTTP endpoint. Leave PR previews disabled unless they have a separate test bot, guild and storage. The public landing page, privacy and terms pages remain removed. `BOT_URL` is unused and can be deleted. `WORKER_URL` is still the existing hallAI worker endpoint.
 
-| Field | Value |
-| --- | --- |
-| Name | `citymart-data` |
-| Destination Path | `/data` |
-| Add suffix for PR deployments | Enabled |
+Set variables in Coolify's **production Environment Variables**, available **at runtime**, with build-time availability disabled. Mark credentials as secrets. `NODE_ENV=production` is already set by the Docker image; the separate build stage installs the TypeScript build tools.
 
-Docker manages the volume on the deployment server; there is no host directory
-to create manually. The bot stores giveaway records and entrants in
-`/data/giveaways.json`. This path is fixed in the bot; a `DATA_DIR` variable is
-not required. A new empty volume starts with no saved giveaways. Existing
-giveaway messages cannot resume participation or winner selection without
-their saved records. Giveaway input dates use the container's local timezone.
+| Variable                  | Purpose                                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`           | Required bot token.                                                                            |
+| `GUILD_ID`                | Required CityMart Discord server ID.                                                           |
+| `CLIENT_ID`               | Optional bot application ID; required only for manual registration.                            |
+| `SUPPORT_CHANNEL_ID`      | Support links and giveaway winner claim links.                                                 |
+| `GENERAL_CHANNEL_ID`      | Optional startup announcement channel.                                                         |
+| `COMMANDS_CHANNEL_ID`     | Optional Roblox community size update channel.                                                 |
+| `ROBLOX_GROUP_ID`         | Roblox community ID; defaults to `36060455`.                                                   |
+| `GIVEAWAY_MIN_ROLE_ID`    | Optional minimum participation role. Unset means all human members may enter.                  |
+| `WORKER_URL`              | HTTPS hallAI worker endpoint; receives the existing POST JSON contract and returns plain text. |
+| `EASYPOS_TOKEN`           | Activity API token.                                                                            |
+| `EASYPOS_DONATIONS_TOKEN` | Donation API token.                                                                            |
+| `EASYPOS_RANKING_TOKEN`   | Ranking API token.                                                                             |
+| `EASYPOS_RANKING_MOD_ID`  | Roblox moderator ID sent to easyPOS.                                                           |
+| `CITYCRAFT_OWNER_USER_ID` | Optional request recipient; defaults to the existing Dave account `651525636351066182`.        |
+| `CITYCRAFT_ADDRESS`       | Defaults to `citycraft.davevancauwenberghe.be`.                                                |
+| `TIME_ZONE`               | Giveaway date input zone; defaults to `Europe/Brussels`.                                       |
+| `DATA_DIR`                | Writable persistent directory; defaults to `/data`.                                            |
+| `PORT`                    | Internal health port; defaults to `8080`.                                                      |
+| `USER_AGENT`              | Optional outbound API identification string.                                                   |
 
-Keep exactly one production bot instance. Under **Advanced > Container**, use
-**Consistent name (no rolling updates)** or a fixed **Custom Container Name** so
-the previous bot stops before its replacement starts. Keep PR previews disabled
-unless they use a separate Discord test bot and separate storage.
+Missing optional integration credentials produce a helpful embed instead of crashing the bot. Invalid configured IDs, URLs or time zones stop startup. Give the bot View Channel, Send Messages, Embed Links and Read Message History in relevant channels, plus Send Messages in Threads where applicable. Administrator and Manage Roles are not needed. Whitelist-request delivery and giveaway winner DMs depend on the recipient allowing DMs.
 
-When replacing Fly.io, copy the required environment values first. Stop the Fly
-bot before starting the Coolify copy. If existing giveaway records are needed,
-transfer them before starting the new container; otherwise use the fresh volume.
+### Storage, health and recovery
 
-### Health monitoring and deployment checks
+Giveaways are stored in `/data/giveaways.json`. The old object-based file is validated and automatically migrated on the first start, with an original copy at `/data/giveaways.json.legacy.bak`. The schema changes: back up before upgrading and restore the old file if rolling back to the old bot. Historical finished giveaways are retained without resending old announcements.
 
-The Dockerfile includes a health check against `GET /ready`; Coolify uses that
-image health check without a separate dashboard command. The probe starts with
-a 60-second grace period, then runs every 30 seconds.
+Writes are serialized, flushed to disk and atomically renamed. An unreadable or corrupt file stops startup; it is not silently reset. Capacity is 2,000 records, 10,000 entrants per giveaway and 20 MiB total. Archive old completed records offline before reaching these limits. Exactly one bot process must use a given volume; this file store does not coordinate multiple replicas.
 
-- `/health`: HTTP 200 while the HTTP process is alive.
-- `/ready`: HTTP 200 when Discord is ready, or HTTP 503 while disconnected.
-- Both endpoints support HEAD and disable response caching.
-- Other paths return HTTP 404; no website or static files are served.
+Pending button activation and entrant-count refreshes are repaired every 30 seconds. A result is saved before delivery. Failed channel edits or announcements are retried every 30 seconds using the saved winner; `/giveaway end` also retries immediately. Public announcement nonces reduce duplicate sends after an interrupted response. Discord and local storage cannot form a single transaction: extremely late retries can still duplicate an announcement. Winner DMs are attempted at most once per draw, so a crash at that boundary can miss a DM; the channel result remains authoritative. Closed DMs do not block completion. Entrants are not pinged because all messages disable automatic mentions.
 
-After deployment, inspect Runtime Logs for `Logged in as ...`, run `/ping`, and
-test the integrations you use. Create a test giveaway and confirm its record
-survives a redeploy. Configure daily storage backups to an off-server S3/R2
-destination; stop the bot during the archive step for a consistent copy.
+- `GET /health`: HTTP 200 while the health listener is alive.
+- `GET /ready`: HTTP 200 only after Discord connects and commands are registered; otherwise HTTP 503.
+- HEAD is supported; responses are not cached; all other paths return 404.
+- Docker probes `/ready` every 30 seconds, with a 90-second startup grace period.
+- SIGTERM/SIGINT stop intake, cancel outbound requests and drain active tasks. Unhandled failures exit with an error so the container can restart.
 
-### Slash-command registration
+Keep regular off-server backups of the volume. If startup reports invalid state, preserve the file and restore a known-good backup. For a pending giveaway result, restore channel permissions or configure access to the saved channel before retrying. For an uncertain ranking result, check Roblox before retrying: ranking mutations are deliberately never retried automatically. Logs include event names, safe error types/status codes and system/Discord error codes; tokens, AI questions, upstream bodies and arbitrary exception messages are omitted.
 
-Existing Discord command registrations survive a hosting move. After changing
-command definitions, run this once from Coolify's application Terminal:
+## Development
 
-```bash
-node deploy-commands.js
-```
-
-This requires `DISCORD_TOKEN`, `CLIENT_ID` and `GUILD_ID` at runtime. It updates
-the configured server's slash commands; it does not need to run on every restart.
-
-## Minecraft / Mojang lookup
-
-Use `/minecraft player username:<name>` to display a Minecraft Java player's
-username, account type, skin model, skin texture and cape. UUID input and output
-are intentionally unavailable on the Discord frontend. Lookups are cached for
-five minutes, with three requests per minute per Discord user and a global
-safety margin below Mojang's documented rate limit.
-
-## Development and checks
-
-Use Node.js **22.12.0 or newer**. The production Docker image uses Node.js 22.
+Use Node.js 24 (see `.nvmrc`).
 
 ```bash
 npm ci
-npm test
+cp .env.example .env
+# Fill in a separate development bot and guild; use DATA_DIR=./data locally.
+npm run dev
 ```
 
-For local startup, put development values in an ignored `.env` file and run
-`npm start`. Giveaway operations require a writable `/data` directory. The health
-tests start local HTTP listeners and simulate connection state; they do not log
-into Discord or call the live integrations.
+```bash
+npm run format:check
+npm run check
+npm test
+npm run build
+npm audit --omit=dev
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
-Licensed under the [MIT License](LICENSE).
+`npm start` runs the compiled application. `npm run commands` manually refreshes guild commands after building, if needed. Local `.env` loading uses Node's built-in loader. Production does not depend on TypeScript, tsx or dotenv.
+
+The tests use temporary storage, mocked Discord interactions, local HTTP servers and mocked integration responses. They never log into Discord or change real Roblox ranks. CI additionally builds the production image and tests volume permission repair, legacy migration, non-root execution and readiness. CodeQL scans TypeScript; Dependabot checks npm, Docker and Actions monthly.
+
+See [REVIEW.md](REVIEW.md) for findings and remaining operational limits, [CHANGELOG.md](CHANGELOG.md) for release changes and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance. Licensed under the [MIT License](LICENSE).

@@ -1,0 +1,47 @@
+# Repository review for 1.4.0
+
+Reviewed the application, command deployment script, utilities, tests, Docker configuration, dependency lockfile, Actions workflows, repository templates and operational documentation. The baseline was main commit `8b699529713ee0267956809b6a94d5860ba055c2`.
+
+## Findings addressed
+
+| Finding                                                                                                                          | Effect                                                                                                  | Change                                                                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keyword templates and slash handlers duplicated feature logic; two message listeners performed keyword/reaction and DM scanning. | Inconsistent responses and a privileged content dependency.                                             | Remove all message listeners; route slash commands and controls through focused modules and one embed/reply system.                                |
+| Administrative checks relied on whichever guild issued the command.                                                              | A copied registration could expose privileged actions outside the intended server.                      | Enforce `GUILD_ID` for commands, buttons, forms and autocomplete, plus server-owner authorization for mutations.                                   |
+| Some handlers performed API/member fetches before acknowledging an interaction.                                                  | Discord's three-second response deadline could be missed.                                               | Defer network-backed commands, buttons and submitted forms first. Modal opening remains an immediate response.                                     |
+| Giveaways used synchronous, non-atomic JSON writes and swallowed failures.                                                       | Success could be reported for data that was never saved; malformed files were replaced later.           | Serialized async saves, file/directory sync and atomic rename; validate on startup, preserve corrupt bytes, migrate with a backup.                 |
+| Periodic and manual draws could overlap; failed sends could lose the result.                                                     | Multiple selections or missing announcements; rerolls could pick the same winner.                       | Per-giveaway locks, cryptographic selection, persistent draw/delivery state, retries using the saved result and winner history.                    |
+| A missing minimum role allowed giveaway entry.                                                                                   | Configured eligibility was bypassed after a role was deleted.                                           | Missing configured roles block entries with an explanatory embed.                                                                                  |
+| Dates used local `Date` normalization.                                                                                           | Impossible dates rolled over; UTC containers and daylight-saving changes produced surprising end times. | Luxon IANA-zone validation, explicit Brussels default, ambiguity checks and elapsed-duration input.                                                |
+| Several integrations had no deadline; the existing timeout stopped after headers.                                                | Hanging response bodies could keep commands pending indefinitely.                                       | Shared fetch client bounds both time and total bytes through body consumption and cancels on shutdown.                                             |
+| Cache misses and conversation histories were unbounded or ineffective.                                                           | Repeated missing-user requests and increasing memory use.                                               | Cache nulls, coalesce loads, cap caches/rate buckets, expire and bound hallAI context.                                                             |
+| hallAI returned plain text, truncated long answers and omitted the question.                                                     | Difficult-to-follow conversations and missing answer content.                                           | Question/answer embeds, bounded continuations, code-fence handling, separate public/private context and reset options.                             |
+| Ranking responses exposed raw upstream errors and retry outcomes were unclear.                                                   | Potential sensitive diagnostics and accidental repeated changes.                                        | Preserve POST contract, sanitize failures, prevent overlapping target changes, never automatically retry mutations and explain uncertain outcomes. |
+| Mojang texture normalization accepted unsupported protocols and credentials.                                                     | Invalid or untrusted texture links could reach embeds.                                                  | Restrict host, protocol, path and credentials; preserve UUID-free output.                                                                          |
+| Fatal process errors were logged while the bot kept running.                                                                     | A damaged process could remain apparently healthy.                                                      | Mark unready, drain work and exit with an error.                                                                                                   |
+| Runtime ran as root; build/runtime concerns and checks were mixed.                                                               | Excessive runtime privileges and insufficient upgrade confidence.                                       | Multi-stage Node 24 image, scoped volume permission repair and privilege drop; tests, strict type checks and container CI.                         |
+| Lockfile retained an affected undici release; CodeQL/runtime docs were stale.                                                    | Known dependency findings and misleading maintenance instructions.                                      | Update the lockfile, current Actions pinned to commits, Node 24, security policy and automated dependency updates.                                 |
+
+## Design and compatibility
+
+TypeScript keeps the mature discord.js ecosystem and adds compile-time checks to commands, Discord payloads and integration boundaries without requiring a separate runtime. New modules separate UI, routing, storage and services. Native Node fetch and environment-file loading replace duplicated HTTP logic and dotenv. Luxon provides explicit IANA-zone and daylight-saving behavior.
+
+Existing environment names, deployed giveaway control IDs, integration endpoints and hallAI's JSON-request/plain-text-response contract are preserved. The renamed `scale_code` option also accepts an old `scalecode` invocation while Discord refreshes. Automatic registration replaces the configured guild's command list. The former keyword `/keywords` command is intentionally removed.
+
+The giveaway file store fits a single small bot and avoids introducing a database service. Use one replica and persistent storage. Old active records migrate; old completed records do not reannounce. The original backup is kept for rollback. There is no claim of exactly-once external delivery: saved winners, Discord nonces and at-most-once DM attempts bound the failure cases described in the README.
+
+## Validation and limits
+
+Regression coverage checks legacy migration/corruption, save failure, concurrent entries and draws, delivery recovery after restart, reroll exclusions, guild/owner boundaries, missing eligibility roles, HTTP body deadlines and byte limits, cache behavior, API contracts, hallAI context/visibility, Discord embed budgets, modal structure and health state.
+
+CI also exercises the real production Docker image with a root-owned legacy volume and verifies the Node process is unprivileged. Live Discord permissions, DM deliverability, paid easyPOS tokens, Roblox availability and the deployed hallAI worker still require the short post-deployment checks in the README. No test changes live ranks or uses production credentials.
+
+## Reference documentation
+
+- [Discord interactions and response deadlines](https://docs.discord.com/developers/interactions/receiving-and-responding)
+- [Discord message and embed constraints](https://docs.discord.com/developers/resources/message)
+- [Discord modal components](https://docs.discord.com/developers/components/using-modal-components)
+- [discord.js](https://discord.js.org/docs/packages/discord.js/14.27.0)
+- [Node.js release schedule](https://nodejs.org/en/about/previous-releases)
+- [easyPOS API](https://papi.easypos.lol/)
+- [Luxon API](https://moment.github.io/luxon/api-docs/index.html)
