@@ -15,9 +15,11 @@ const {
   TextInputStyle
 } = require('discord.js');
 
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { createHealthServer, parsePort } = require('./utils/health');
+
+const PORT = parsePort(process.env.PORT);
 
 // Static embed templates are created when the process starts. Always clone them
 // immediately before sending so Discord receives the current instant rather than
@@ -202,7 +204,6 @@ const {
   GENERAL_CHANNEL_ID,
   COMMANDS_CHANNEL_ID,
   ROBLOX_GROUP_ID,
-  BOT_URL,
   USER_AGENT,
   GIVEAWAY_MIN_ROLE_ID,
   EASYPOS_TOKEN,
@@ -218,14 +219,13 @@ if (!SUPPORT_CHANNEL_ID) console.warn('⚠️ SUPPORT_CHANNEL_ID is not set.');
 if (!GENERAL_CHANNEL_ID) console.warn('⚠️ GENERAL_CHANNEL_ID is not set.');
 if (!COMMANDS_CHANNEL_ID) console.warn('⚠️ COMMANDS_CHANNEL_ID is not set (Roblox tracker + toasts).');
 if (!ROBLOX_GROUP_ID) console.warn('⚠️ ROBLOX_GROUP_ID is not set (Roblox tracker + /communitycount + memberlookup badge).');
-if (!BOT_URL) console.warn('⚠️ BOT_URL is not set; help/Dashboard link will be plain text.');
 if (!GIVEAWAY_MIN_ROLE_ID) console.warn('⚠️ GIVEAWAY_MIN_ROLE_ID not set — giveaway rank restriction disabled.');
 if (!EASYPOS_TOKEN) console.warn('⚠️ EASYPOS_TOKEN not set — /activity command will be disabled.');
 if (!EASYPOS_DONATIONS_TOKEN) console.warn('⚠️ EASYPOS_DONATIONS_TOKEN not set — /donations and /donationsleaderboard will be disabled.');
 if (!EASYPOS_RANKING_TOKEN) console.warn('⚠️ EASYPOS_RANKING_TOKEN not set — /ranking commands will be disabled.');
 if (!EASYPOS_RANKING_MOD_ID) console.warn('⚠️ EASYPOS_RANKING_MOD_ID not set — /ranking has no modId to send to easyPOS.');
 
-const OUTBOUND_UA = USER_AGENT || 'CityMartServicesBot/1.1 (+https://citymart-bot.fly.dev)';
+const OUTBOUND_UA = USER_AGENT || `CityMartServicesBot/${require('./package.json').version} (+https://github.com/davevancauwenberghe/CityMart-Services)`;
 
 // ---------------------- Discord Client ----------------------
 const client = new Client({
@@ -793,8 +793,7 @@ const HELP_EMBED = new EmbedBuilder()
     { name: '🔗 Roblox Links', value: 'community\nexperience\napplication', inline: false },
     { name: '🆘 Support', value: 'support\ndocumentation', inline: false },
     { name: '📖 Misc', value: 'lorebook\nlamp\nping\nask\ncommunitycount\nmemberlookup <username>', inline: false },
-    { name: '⛏️ Minecraft', value: '`/minecraft player username:<name>` — view a Java player’s skin, cape, and account details', inline: false },
-    { name: '🔗 Dashboard', value: BOT_URL ? `[Bot Dashboard](${BOT_URL})` : 'Bot Dashboard', inline: false }
+    { name: '⛏️ Minecraft', value: '`/minecraft player username:<name>` — view a Java player’s skin, cape, and account details', inline: false }
   )
   .setFooter({ text: 'Need help? Ping CityMart Services with a keyword or use /keywords' })
   .setTimestamp();
@@ -1242,7 +1241,7 @@ client.on('messageCreate', async message => {
       const pingEmbed = new EmbedBuilder()
         .setTitle('🏓 Pong!')
         .setThumbnail(THUMBNAIL_URL)
-        .setDescription(`Latency is **${latency}ms**\n\n🔗 [Bot Dashboard](${BOT_URL})`)
+        .setDescription(`Latency is **${latency}ms**`)
         .setColor(0x00FFAA)
         .setFooter({ text: 'CityMart Services' })
         .setTimestamp();
@@ -1428,7 +1427,7 @@ client.on('interactionCreate', async interaction => {
         const pingEmbed = new EmbedBuilder()
           .setTitle('🏓 Pong!')
           .setThumbnail(THUMBNAIL_URL)
-          .setDescription(`Latency is **${latency}ms**\n\n🔗 [Bot Dashboard](${BOT_URL})`)
+          .setDescription(`Latency is **${latency}ms**`)
           .setColor(0x00FFAA)
           .setFooter({ text: 'CityMart Services' })
           .setTimestamp();
@@ -2290,31 +2289,12 @@ client.on('interactionCreate', async interaction => {
 
 client.login(DISCORD_TOKEN);
 
-// ---------------------- Tiny landing page server ----------------------
-const PORT = process.env.PORT || 8080;
-const PUBLIC_INDEX_PATH = path.join(__dirname, 'public', 'index.html');
-
-http
-  .createServer((req, res) => {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.writeHead(405, { Allow: 'GET, HEAD' });
-      return res.end();
-    }
-
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=UTF-8',
-      'Cache-Control': 'public, max-age=300'
-    });
-
-    if (req.method === 'HEAD') return res.end();
-
-    return fs.createReadStream(PUBLIC_INDEX_PATH)
-      .on('error', () => {
-        if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Error loading page');
-      })
-      .pipe(res);
+// ---------------------- Internal health monitoring ----------------------
+createHealthServer(() => client.isReady())
+  .on('error', err => {
+    console.error('Health server failed:', err.message);
+    process.exit(1);
   })
   .listen(PORT, '0.0.0.0', () => {
-    console.log(`🌐 HTTP server listening on port ${PORT}`);
+    console.log(`🩺 Health server listening on port ${PORT}`);
   });
