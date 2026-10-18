@@ -36,11 +36,12 @@ Administrative actions are restricted to the configured Discord server's owner. 
 ## Upgrade the existing Coolify application
 
 1. Back up the existing `/data` volume before upgrading. Keep it mounted at `/data`.
-2. Merge the reviewed PR and deploy `main` using the **Dockerfile** build pack. Keep only one production instance, with **Consistent name (no rolling updates)** enabled. Avoid running the Fly copy or PR previews with the production bot token.
-3. Keep your existing runtime environment variables. No new secret is required. `CLIENT_ID` is checked when set, or derived from the logged-in bot when absent. Do not override the new Docker start command with `node index.js`.
-4. Ensure the Discord installation includes `bot` and `applications.commands`. The bot registers the current guild command list automatically at startup, replacing `/keywords` with `/help`.
-5. **Message Content Intent, Server Members Intent and Presence Intent are unnecessary and can be disabled** in the Developer Portal. The bot uses only the Guilds gateway intent and fetches individual members when needed.
-6. Read Runtime Logs for `CityMart Services v1.4.0 ready as ... Slash commands registered.` Then check `/help`, `/user`, `/ask`, and your enabled integrations. Create a small test giveaway, enter it, redeploy, and confirm the saved entry and eventual result.
+2. Deploy the companion Hall v2 Worker first, with its `OPENAI_API_KEY` and `DISCORD_API_KEY` secrets configured.
+3. Before deploying this bot, set `WORKER_URL` to the Worker's HTTPS origin (for example, `https://hall.davevancauwenberghe.be`) and `HALLAI_API_KEY` to exactly the same secret as the Worker's `DISCORD_API_KEY`. Add them to Coolify's **production runtime Environment Variables**, with build-time availability disabled, and mark `HALLAI_API_KEY` as a secret. **Both variables are required for `/ask` and `/forget`.** Keep your other runtime variables; `CLIENT_ID` is checked when set, or derived from the logged-in bot when absent.
+4. Merge the reviewed PR and deploy `main` using the **Dockerfile** build pack. Keep only one production instance, with **Consistent name (no rolling updates)** enabled. Avoid running the Fly copy or PR previews with the production bot token. Do not override the new Docker start command with `node index.js`.
+5. Ensure the Discord installation includes `bot` and `applications.commands`. The bot registers the current guild command list automatically at startup, replacing `/keywords` with `/help`.
+6. **Message Content Intent, Server Members Intent and Presence Intent are unnecessary and can be disabled** in the Developer Portal. The bot uses only the Guilds gateway intent and fetches individual members when needed.
+7. Read Runtime Logs for `CityMart Services v1.4.0 ready as ... Slash commands registered.` Then check `/help`, `/user`, `/ask`, `/forget`, and your enabled integrations. Create a small test giveaway, enter it, redeploy, and confirm the saved entry and eventual result.
 
 The Docker entrypoint repairs ownership of the bot's data directory and its two known data files, then runs Node as the container's unprivileged `node` user. No additional Linux account is needed on the VPS. It does not recursively change unrelated files. Custom volume layouts must allow UID 1000 to write `DATA_DIR`.
 
