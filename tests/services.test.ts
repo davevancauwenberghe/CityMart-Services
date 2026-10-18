@@ -11,6 +11,7 @@ import {
 } from '../src/services/minecraft.js';
 import { Hallai } from '../src/services/hallai.js';
 import { readConfig } from '../src/config.js';
+import { UserError } from '../src/core.js';
 const config = readConfig({
   DISCORD_TOKEN: 'fake',
   GUILD_ID: '100000000000000001',
@@ -133,6 +134,57 @@ test('Minecraft caches the complete lookup and never returns a UUID in its publi
 
 const hallKey = '100000000000000001:200000000000000001:400000000000000001:public';
 
+test('Hall setup warnings identify incomplete runtime configuration without exposing credentials', () => {
+  assert.equal(new Hallai(http(), '').configurationWarning, undefined);
+  const missingKey = new Hallai(http(), 'https://example.com').configurationWarning!;
+  assert.match(missingKey, /HALLAI_API_KEY is missing/);
+  assert.match(missingKey, /Worker's DISCORD_API_KEY/);
+  assert.match(missingKey, /production runtime/);
+  assert.match(missingKey, /redeploy/);
+  const missingUrl = new Hallai(http(), '', 'secret-fixture').configurationWarning!;
+  assert.match(missingUrl, /WORKER_URL is missing/);
+  assert.ok(!missingUrl.includes('secret-fixture'));
+  const configured = readConfig({
+    DISCORD_TOKEN: 'fake',
+    GUILD_ID: config.guildId,
+    WORKER_URL: ' https://example.com ',
+    HALLAI_API_KEY: ' integration-secret ',
+  });
+  assert.equal(configured.hallaiApiKey, 'integration-secret');
+  assert.equal(configured.workerUrl, 'https://example.com');
+  assert.equal(
+    new Hallai(http(), configured.workerUrl, configured.hallaiApiKey).configurationWarning,
+    undefined,
+  );
+});
+
+test('incomplete Hall setup blocks public/private ask and forget before making any HTTP request', async (t) => {
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    throw new Error('Unexpected request');
+  });
+  for (const [url, secret] of [
+    ['', ''],
+    ['https://example.com', ''],
+    ['', 'secret-fixture'],
+  ]) {
+    const ai = new Hallai(http(), url!, secret!);
+    for (const scope of ['public', 'private']) {
+      const key = hallKey.replace(/public$/, scope);
+      for (const action of [() => ai.ask(key, 'Question'), () => ai.forget(key)])
+        await assert.rejects(action, (error) => {
+          assert.ok(error instanceof UserError);
+          assert.match(error.message, /Discord connection is not configured/);
+          assert.ok(!error.message.includes('private conversation memory'));
+          assert.ok(!error.message.includes('secret-fixture'));
+          return true;
+        });
+    }
+  }
+  assert.equal(requests, 0);
+});
+
 test('hallAI sends authenticated identities and lets the Worker own persistent context', async (t) => {
   const requests: { url: string; body: Record<string, unknown> }[] = [];
   t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
@@ -183,9 +235,7 @@ test('hallAI rejects overlapping questions rather than mixing conversation histo
   await pending;
 });
 
-test('Hall requires integration auth, rejects stateless responses and never exposes upstream error bodies', async (t) => {
-  const missing = new Hallai(http(), 'https://example.com');
-  await assert.rejects(missing.ask(hallKey, 'Question'), /finish its setup/);
+test('Hall rejects stateless responses and never exposes upstream error bodies', async (t) => {
   let status = 200;
   t.mock.method(
     globalThis,
@@ -206,4 +256,42 @@ test('Hall requires integration auth, rejects stateless responses and never expo
   status = 429;
   await assert.rejects(ai.ask(hallKey, 'Rate limit'), /message limit/);
   await assert.rejects(ai.ask('invalid', 'Wrong identity'), /could not be identified/);
+});
+
+test('Hall reports rejected integration credentials safely and never retries without authentication', async (t) => {
+  const requests: string[] = [],
+    logs: string[] = [];
+  let status = 401;
+  t.mock.method(console, 'error', (value: string) => logs.push(value));
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    requests.push(url);
+    assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer secret-fixture');
+    return new Response('SECRET_UPSTREAM_BODY', { status });
+  });
+  for (status of [401, 403]) {
+    const ai = new Hallai(http(), 'https://example.com', 'secret-fixture');
+    for (const action of [
+      () => ai.ask(hallKey, 'PRIVATE_PROMPT'),
+      () => ai.ask(hallKey, 'PRIVATE_PROMPT', true),
+      () => ai.forget(hallKey),
+    ])
+      await assert.rejects(action, (error) => {
+        assert.ok(error instanceof UserError);
+        assert.match(error.message, /Discord connection was refused/);
+        assert.ok(!/SECRET_UPSTREAM_BODY|secret-fixture/.test(error.message));
+        return true;
+      });
+  }
+  assert.deepEqual(
+    requests.map((url) => new URL(url).pathname),
+    ['/api/chat', '/api/reset', '/api/reset', '/api/chat', '/api/reset', '/api/reset'],
+  );
+  assert.equal(logs.length, 6);
+  for (const log of logs) {
+    const entry = JSON.parse(log);
+    assert.equal(entry.service, 'hallAI');
+    assert.ok([401, 403].includes(entry.status));
+    assert.match(entry.event, /matching_integration_secrets/);
+    assert.ok(!/SECRET_UPSTREAM_BODY|secret-fixture|PRIVATE_PROMPT|https:/.test(log));
+  }
 });

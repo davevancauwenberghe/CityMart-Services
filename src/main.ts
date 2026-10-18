@@ -31,6 +31,8 @@ const client = new Client({
   rest: { timeout: 15_000, retries: 0 },
 });
 const http = new HttpClient(config.userAgent);
+const hallai = new Hallai(http, config.workerUrl, config.hallaiApiKey);
+if (hallai.configurationWarning) console.warn(hallai.configurationWarning);
 const store = new GiveawayStore(join(config.dataDir, 'giveaways.json'));
 const roblox = new Roblox(http, config);
 const giveaways = new Giveaways(store, client, config);
@@ -38,7 +40,7 @@ const router = new Router(config, client, {
   roblox,
   easypos: new Easypos(http, config),
   minecraft: new Minecraft(http),
-  hallai: new Hallai(http, config.workerUrl, config.hallaiApiKey),
+  hallai,
   giveaways,
   citycraft: new Citycraft(client, config),
 });

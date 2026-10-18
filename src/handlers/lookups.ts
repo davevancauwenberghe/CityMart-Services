@@ -144,7 +144,8 @@ export async function lookup(
 
 export async function ask(interaction: ChatInputCommandInteraction, hallai: Hallai) {
   const prompt = interaction.options.getString('prompt', true);
-  const question = `**Your question**\n${literal(prompt, 2050)}\n\n**Hall’s answer**\n`;
+  const question = `**Your question**\n${literal(prompt, 2050)}\n\n`;
+  const answerIntro = question + '**Hall’s answer**\n';
   const author = {
     name: clip(interaction.user.displayName, 256),
     iconURL: interaction.user.displayAvatarURL(),
@@ -159,6 +160,7 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
       embed(
         'hallAI is unavailable',
         question +
+          '**Status**\n' +
           (error instanceof UserError
             ? error.message
             : 'Your question could not be answered right now. Please try again shortly.'),
@@ -169,11 +171,11 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
     ]);
     return;
   }
-  const chunks = splitAnswer(answer, Math.min(3500, 4096 - question.length));
+  const chunks = splitAnswer(answer, Math.min(3500, 4096 - answerIntro.length));
   const answerEmbed = (text: string, index: number) =>
     embed(
       index ? `hallAI • continued (${index + 1}/${chunks.length})` : 'hallAI’s answer',
-      index ? text : question + text,
+      index ? text : answerIntro + text,
       'ai',
     )
       .setAuthor(author)
