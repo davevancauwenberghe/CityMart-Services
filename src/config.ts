@@ -49,6 +49,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     timeZone,
     dataDir: resolve(env.DATA_DIR || '/data'),
     workerUrl,
+    hallaiApiKey: env.HALLAI_API_KEY?.trim() || '',
     groupId,
     supportChannelId: id('SUPPORT_CHANNEL_ID'),
     generalChannelId: id('GENERAL_CHANNEL_ID'),

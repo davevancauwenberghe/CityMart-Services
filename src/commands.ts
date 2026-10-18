@@ -65,6 +65,12 @@ export const commands = [
     .addBooleanOption((option) =>
       option.setName('reset').setDescription('Start a fresh conversation before asking'),
     ),
+  base('forget', 'Delete your Hall conversation memory in this channel').addBooleanOption(
+    (option) =>
+      option
+        .setName('private')
+        .setDescription('Clear private /ask context (default: clear public context)'),
+  ),
   username(base('memberlookup', 'View a Roblox profile and CityMart community role')),
   username(base('activity', 'View a Roblox player’s CityMart activity')),
   username(base('donations', 'View a Roblox player’s CityMart donations')),

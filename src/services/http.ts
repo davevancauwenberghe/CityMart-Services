@@ -14,6 +14,7 @@ export class HttpClient {
     url: string,
     body?: unknown,
     timeout = this.timeoutMs,
+    headers: Record<string, string> = {},
   ): Promise<{ status: number; text: string }> {
     const controller = new AbortController();
     this.controllers.add(controller);
@@ -27,6 +28,7 @@ export class HttpClient {
           'User-Agent': this.userAgent,
           Accept: 'application/json, text/plain',
           ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+          ...headers,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
       });

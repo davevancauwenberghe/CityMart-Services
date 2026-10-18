@@ -3,7 +3,7 @@ import type { Config } from './config.js';
 import { RateLimit, UserError, safeLog } from './core.js';
 import { defer, respond, respondError, embed, literal } from './ui.js';
 import { info, help } from './handlers/info.js';
-import { lookup, ask } from './handlers/lookups.js';
+import { lookup, ask, forget } from './handlers/lookups.js';
 import {
   giveawayCommand,
   giveawayButton,
@@ -95,12 +95,22 @@ export class Router {
       )
         return await this.services.citycraft.show(interaction);
       const privateReply =
-        ['help', 'about', 'ping', 'support', 'citycraft', 'user', 'giveaway', 'ranking'].includes(
-          interaction.commandName,
-        ) ||
+        [
+          'help',
+          'about',
+          'ping',
+          'support',
+          'citycraft',
+          'user',
+          'giveaway',
+          'ranking',
+          'forget',
+        ].includes(interaction.commandName) ||
         (interaction.commandName === 'ask' && interaction.options.getBoolean('private') === true);
       await defer(interaction, privateReply);
       if (interaction.commandName === 'ask') return await ask(interaction, this.services.hallai);
+      if (interaction.commandName === 'forget')
+        return await forget(interaction, this.services.hallai);
       if (interaction.commandName === 'citycraft')
         return await this.services.citycraft.info(interaction);
       if (interaction.commandName === 'giveaway')

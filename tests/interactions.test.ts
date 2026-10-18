@@ -160,6 +160,7 @@ test('/ask includes the complete original question, respects embed budgets and k
   await ask(interaction, ai);
   assertEmbeds(replies);
   assert.ok(replies[0]!.embeds[0]!.toJSON().description?.includes(literal('*'.repeat(1000), 2050)));
+  assert.equal(replies[0]!.embeds.length, 1);
   assert.ok(replies.length > 1);
   for (const followup of replies.slice(1)) assert.equal(followup.flags, 64);
 });
@@ -172,8 +173,9 @@ test('/ask failure still shows the user’s question in an embed', async () => {
     },
   } as unknown as Hallai);
   assertEmbeds(replies);
-  assert.equal(replies[0]!.embeds[0]!.data.description, 'Where is my cart?');
-  assert.equal(replies[0]!.embeds[1]!.data.description, 'Please wait.');
+  assert.equal(replies[0]!.embeds.length, 1);
+  assert.match(replies[0]!.embeds[0]!.data.description!, /Where is my cart/);
+  assert.match(replies[0]!.embeds[0]!.data.description!, /Please wait/);
 });
 
 test('all information and player command families produce branded embeds within Discord limits', async () => {
@@ -355,4 +357,38 @@ test('CityCraft delivers an embedded whitelist request once and confirms it priv
   assertEmbeds(context.replies);
   await assert.rejects(citycraft.submit(submit), /form expired/);
   assert.equal(sent.length, 1);
+});
+
+test('/ask puts the question and a normal answer in one embed', async () => {
+  const context = mockInteraction('ask', { prompt: 'How are you?' });
+  await ask(context.interaction, {
+    ask: async () => 'Ready for a good question.',
+  } as unknown as Hallai);
+  assert.equal(context.replies.length, 1);
+  assert.equal(context.replies[0]!.embeds.length, 1);
+  const description = context.replies[0]!.embeds[0]!.data.description!;
+  assert.match(description, /How are you/);
+  assert.match(description, /Ready for a good question/);
+  assertEmbeds(context.replies);
+});
+
+test('/forget chooses the requested context scope and always confirms privately through the router', async () => {
+  const keys: string[] = [];
+  const hallai = {
+    forget: async (key: string) => {
+      keys.push(key);
+    },
+  } as unknown as Hallai;
+  for (const privateContext of [false, true]) {
+    const context = mockInteraction('forget', {}, { private: privateContext });
+    const router = new Router(config, client, { hallai } as unknown as ConstructorParameters<
+      typeof Router
+    >[2]);
+    router.handle(context.interaction);
+    await Promise.all(router.pending);
+    assert.equal(context.raw.ephemeral, true);
+    assertEmbeds(context.replies);
+  }
+  assert.ok(keys[0]!.endsWith(':public'));
+  assert.ok(keys[1]!.endsWith(':private'));
 });
