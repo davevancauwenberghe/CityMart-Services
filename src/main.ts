@@ -38,7 +38,7 @@ const router = new Router(config, client, {
   roblox,
   easypos: new Easypos(http, config),
   minecraft: new Minecraft(http),
-  hallai: new Hallai(http, config.workerUrl),
+  hallai: new Hallai(http, config.workerUrl, config.hallaiApiKey),
   giveaways,
   citycraft: new Citycraft(client, config),
 });

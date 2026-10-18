@@ -27,7 +27,7 @@ const helpSections = {
   ],
   tools: [
     'Tools & events',
-    '`/ask prompt [private] [reset]` — hallAI with your question shown above the answer. Recent conversation context is kept for 30 minutes and sent to hallAI. Use reset for a new conversation.\n`/citycraft info` — server details\n`/citycraft request` — request whitelist access\n`/giveaway list` — active and recent giveaways\n`/giveaway entries message_id` — browse entries\n\nUse the **Enter giveaway** button on an active giveaway to join.',
+    '`/ask prompt [private] [reset]` — hallAI with your question and answer in one embed. Hall remembers up to 12 exchanges for 24 hours of inactivity, separately for each member, channel and reply mode. Use reset for a new conversation.\n`/forget [private]` — delete your Hall context in this channel; confirmation is private.\n`/citycraft info` — server details\n`/citycraft request` — request whitelist access\n`/giveaway list` — active and recent giveaways\n`/giveaway entries message_id` — browse entries\n\nUse the **Enter giveaway** button on an active giveaway to join.',
   ],
   owner: [
     'Server owner tools',

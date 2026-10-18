@@ -131,28 +131,39 @@ test('Minecraft caches the complete lookup and never returns a UUID in its publi
   assert.equal('id' in first, false);
 });
 
-test('hallAI preserves its worker contract, expires context, and reset starts cleanly', async (t) => {
-  const bodies: {
-    prompt: string;
-    identifier: string;
-    messages: { role: string; content: string }[];
-  }[] = [];
-  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: RequestInit) => {
-    bodies.push(JSON.parse(init.body as string));
-    return new Response('A helpful answer');
+const hallKey = '100000000000000001:200000000000000001:400000000000000001:public';
+
+test('hallAI sends authenticated identities and lets the Worker own persistent context', async (t) => {
+  const requests: { url: string; body: Record<string, unknown> }[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    assert.equal(
+      (init.headers as Record<string, string>).Authorization,
+      'Bearer integration-secret',
+    );
+    requests.push({ url, body: JSON.parse(init.body as string) });
+    return json(
+      url.endsWith('/api/reset') ? { ok: true } : { reply: 'A helpful answer', memory: 'session' },
+    );
   });
-  let now = 0;
-  const ai = new Hallai(http(), 'https://example.com/worker', () => now);
-  await ai.ask('a', 'First?');
-  await ai.ask('a', 'Second?');
-  assert.equal(bodies[0]!.identifier, 'a');
-  assert.equal(bodies[0]!.prompt, 'First?');
-  assert.equal(bodies[1]!.messages.length, 4);
-  await ai.ask('a', 'Fresh?', true);
-  assert.equal(bodies[2]!.messages.length, 2);
-  now += 31 * 60_000;
-  await ai.ask('a', 'Expired?');
-  assert.equal(bodies[3]!.messages.length, 2);
+  const ai = new Hallai(http(), 'https://example.com', 'integration-secret');
+  await ai.ask(hallKey, 'First?');
+  await ai.ask(hallKey, 'Second?');
+  const restarted = new Hallai(http(), 'https://example.com', 'integration-secret');
+  await restarted.ask(hallKey, 'After restart?');
+  assert.equal(requests[0]!.url, 'https://example.com/api/chat');
+  assert.equal(requests[0]!.body.source, 'discord');
+  assert.equal(requests[0]!.body.user_id, '400000000000000001');
+  assert.equal(requests[0]!.body.channel_id, '200000000000000001');
+  assert.equal(requests[0]!.body.visibility, 'public');
+  assert.equal(requests[0]!.body.prompt, 'First?');
+  assert.equal(requests[0]!.body.messages, undefined);
+  assert.equal(requests[0]!.body.user_id, requests[2]!.body.user_id);
+  assert.notEqual(requests[0]!.body.request_id, requests[1]!.body.request_id);
+  await ai.ask(hallKey, 'Fresh?', true);
+  assert.ok(requests[3]!.url.endsWith('/api/reset'));
+  assert.ok(requests[4]!.url.endsWith('/api/chat'));
+  await ai.forget(hallKey);
+  assert.ok(requests[5]!.url.endsWith('/api/reset'));
 });
 
 test('hallAI rejects overlapping questions rather than mixing conversation histories', async (t) => {
@@ -162,11 +173,37 @@ test('hallAI rejects overlapping questions rather than mixing conversation histo
   });
   t.mock.method(globalThis, 'fetch', async () => {
     await gate;
-    return new Response('Answer');
+    return json({ reply: 'Answer', memory: 'session' });
   });
-  const ai = new Hallai(http(), 'https://example.com');
-  const pending = ai.ask('same', 'First?');
-  await assert.rejects(ai.ask('same', 'Second?'), /previous question/);
+  const ai = new Hallai(http(), 'https://example.com', 'integration-secret');
+  const pending = ai.ask(hallKey, 'First?');
+  await assert.rejects(ai.ask(hallKey, 'Second?'), /previous question/);
+  await assert.rejects(ai.forget(hallKey), /previous question/);
   release!();
   await pending;
+});
+
+test('Hall requires integration auth, rejects stateless responses and never exposes upstream error bodies', async (t) => {
+  const missing = new Hallai(http(), 'https://example.com');
+  await assert.rejects(missing.ask(hallKey, 'Question'), /finish its setup/);
+  let status = 200;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(
+        status === 200 ? JSON.stringify({ reply: 'Answer', memory: 'none' }) : 'SECRET_TOKEN',
+        { status },
+      ),
+  );
+  const ai = new Hallai(http(), 'https://example.com', 'integration-secret');
+  await assert.rejects(ai.ask(hallKey, 'No context'), /hallAI request failed/);
+  status = 500;
+  await assert.rejects(
+    ai.ask(hallKey, 'Provider error'),
+    (error) => error instanceof Error && !error.message.includes('SECRET_TOKEN'),
+  );
+  status = 429;
+  await assert.rejects(ai.ask(hallKey, 'Rate limit'), /message limit/);
+  await assert.rejects(ai.ask('invalid', 'Wrong identity'), /could not be identified/);
 });

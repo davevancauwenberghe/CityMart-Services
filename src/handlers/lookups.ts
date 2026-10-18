@@ -144,10 +144,11 @@ export async function lookup(
 
 export async function ask(interaction: ChatInputCommandInteraction, hallai: Hallai) {
   const prompt = interaction.options.getString('prompt', true);
-  const question = embed('Your question', literal(prompt, 2050), 'ai').setAuthor({
+  const question = `**Your question**\n${literal(prompt, 2050)}\n\n**Hall’s answer**\n`;
+  const author = {
     name: clip(interaction.user.displayName, 256),
     iconURL: interaction.user.displayAvatarURL(),
-  });
+  };
   const key = `${interaction.guildId}:${interaction.channelId}:${interaction.user.id}:${interaction.ephemeral ? 'private' : 'public'}`;
   let answer: string;
   try {
@@ -155,28 +156,45 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
   } catch (error) {
     if (!(error instanceof UserError)) safeLog('hallai_failed', error);
     await respond(interaction, [
-      question,
       embed(
         'hallAI is unavailable',
-        error instanceof UserError
-          ? error.message
-          : 'Your question could not be answered right now. Please try again shortly.',
+        question +
+          (error instanceof UserError
+            ? error.message
+            : 'Your question could not be answered right now. Please try again shortly.'),
         'error',
-      ),
+      )
+        .setAuthor(author)
+        .setThumbnail(null),
     ]);
     return;
   }
-  const chunks = splitAnswer(answer);
+  const chunks = splitAnswer(answer, Math.min(3500, 4096 - question.length));
   const answerEmbed = (text: string, index: number) =>
     embed(
       index ? `hallAI • continued (${index + 1}/${chunks.length})` : 'hallAI’s answer',
-      text,
+      index ? text : question + text,
       'ai',
-    ).setThumbnail(null);
-  await respond(interaction, [question, answerEmbed(chunks[0]!, 0)]);
+    )
+      .setAuthor(author)
+      .setThumbnail(null);
+  await respond(interaction, [answerEmbed(chunks[0]!, 0)]);
   for (let index = 1; index < chunks.length; index++)
     await interaction.followUp({
       ...message([answerEmbed(chunks[index]!, index)]),
       flags: interaction.ephemeral ? MessageFlags.Ephemeral : undefined,
     });
+}
+
+export async function forget(interaction: ChatInputCommandInteraction, hallai: Hallai) {
+  const scope = interaction.options.getBoolean('private') === true ? 'private' : 'public';
+  const key = `${interaction.guildId}:${interaction.channelId}:${interaction.user.id}:${scope}`;
+  await hallai.forget(key);
+  await respond(interaction, [
+    embed(
+      'Hall’s context cleared',
+      `Your **${scope}** /ask conversation memory in this channel has been deleted. Your next question starts fresh. Existing Discord messages remain in the channel.`,
+      'success',
+    ).setThumbnail(null),
+  ]);
 }
