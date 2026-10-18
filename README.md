@@ -136,3 +136,13 @@ See [REVIEW.md](REVIEW.md) for findings and remaining operational limits, [CHANG
 Deploy Hall v2 first and set its `OPENAI_API_KEY` and `DISCORD_API_KEY` secrets. Set `WORKER_URL` to its origin and `HALLAI_API_KEY` to the same integration secret in this bot’s runtime environment, then deploy this bot. Startup registers `/forget` alongside `/ask`. Never put this secret in the public site. Without it, other bot commands still work and Hall commands explain that setup is incomplete.
 
 The Worker owns moderation, GPT-6 Luna, request deduplication and expiring memory. The bot supplies verified Discord interaction identifiers and never sends its own system prompt or client-controlled history. There is no automatic retry of paid generation. Question text is escaped, mentions are disabled and question plus answer share one embed. Oversized replies continue in further embeds within Discord limits; private continuations stay private.
+
+### Fix an incomplete Hall Discord connection
+
+The older message “hallAI is not configured for private conversation memory yet” means `HALLAI_API_KEY` is missing or empty in the running bot. It affects both public and private `/ask` requests, as well as `/forget`, and occurs before the bot contacts the Worker. The web app uses a separate connection and can already be working.
+
+1. Configure the Hall Worker's `DISCORD_API_KEY` secret. This is a shared bot-to-Worker integration secret, separate from `OPENAI_API_KEY` and the bot's `DISCORD_TOKEN`.
+2. In Coolify's **production Environment Variables**, set `HALLAI_API_KEY` to exactly the same shared secret and `WORKER_URL` to the Worker's HTTPS origin, such as `https://hall.davevancauwenberghe.be`. Make both available at runtime, disable build-time availability, and mark `HALLAI_API_KEY` as a secret.
+3. Save the variables and redeploy the bot so its process receives the updated environment. Test `/ask`, a follow-up question and `/forget`; repeat with `private:true` to check the separate private context.
+
+A partially configured integration now prints a startup warning naming the missing variable without revealing secret values. Missing settings and rejected credentials are shown as a **Status** in the combined question/error embed. Worker HTTP 401/403 responses log a safe access-denied event; check that `WORKER_URL` is correct and the two integration secrets match. Other bot commands remain available. A completely disabled Hall integration (both variables empty) produces no startup warning.

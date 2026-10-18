@@ -8,7 +8,8 @@ import { info, help } from '../src/handlers/info.js';
 import { Citycraft } from '../src/handlers/citycraft.js';
 import { UserError } from '../src/core.js';
 import { splitAnswer, literal } from '../src/ui.js';
-import type { Hallai } from '../src/services/hallai.js';
+import { Hallai } from '../src/services/hallai.js';
+import { HttpClient } from '../src/services/http.js';
 import type { Roblox } from '../src/services/roblox.js';
 import type { Easypos } from '../src/services/easypos.js';
 import type { Minecraft } from '../src/services/minecraft.js';
@@ -176,6 +177,35 @@ test('/ask failure still shows the user’s question in an embed', async () => {
   assert.equal(replies[0]!.embeds.length, 1);
   assert.match(replies[0]!.embeds[0]!.data.description!, /Where is my cart/);
   assert.match(replies[0]!.embeds[0]!.data.description!, /Please wait/);
+  assert.match(replies[0]!.embeds[0]!.data.description!, /\*\*Status\*\*/);
+  assert.doesNotMatch(replies[0]!.embeds[0]!.data.description!, /\*\*Hall’s answer\*\*/);
+});
+
+test('/ask setup failures keep one question/status embed and preserve the requested reply privacy', async (t) => {
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    throw new Error('Unexpected request');
+  });
+  for (const privateReply of [false, true]) {
+    const context = mockInteraction('ask', { prompt: 'Test question' }, { private: privateReply });
+    const hallai = new Hallai(new HttpClient('test'), 'https://example.com');
+    const router = new Router(config, client, { hallai } as unknown as ConstructorParameters<
+      typeof Router
+    >[2]);
+    router.handle(context.interaction);
+    await Promise.all(router.pending);
+    assert.equal(context.raw.ephemeral, privateReply);
+    assert.equal(context.replies.length, 1);
+    assert.equal(context.replies[0]!.embeds.length, 1);
+    const description = context.replies[0]!.embeds[0]!.data.description!;
+    assert.match(description, /Test question/);
+    assert.match(description, /\*\*Status\*\*/);
+    assert.match(description, /Discord connection is not configured/);
+    assert.doesNotMatch(description, /\*\*Hall’s answer\*\*|HALLAI_API_KEY|DISCORD_API_KEY/);
+    assertEmbeds(context.replies);
+  }
+  assert.equal(requests, 0);
 });
 
 test('all information and player command families produce branded embeds within Discord limits', async () => {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { UserError, ServiceError, RateLimit } from '../core.js';
+import { UserError, ServiceError, RateLimit, safeLog } from '../core.js';
 import type { HttpClient } from './http.js';
 
 /** Context belongs to Hall, surviving bot restarts without a second transcript. */
@@ -11,11 +11,16 @@ export class Hallai {
     private readonly url: string,
     private readonly apiKey = '',
   ) {}
+  get configurationWarning(): string | undefined {
+    if (!this.url && !this.apiKey) return undefined;
+    const missing = !this.url ? 'WORKER_URL' : !this.apiKey ? 'HALLAI_API_KEY' : undefined;
+    if (!missing) return undefined;
+    return `Hall Discord setup incomplete: ${missing} is missing. Set WORKER_URL to the Hall Worker origin and HALLAI_API_KEY to the Worker's DISCORD_API_KEY in Coolify's production runtime environment, then redeploy the bot.`;
+  }
   private identity(key: string) {
-    if (!this.url) throw new UserError('hallAI has not been enabled by the server owner yet.');
-    if (!this.apiKey)
+    if (!this.url || !this.apiKey)
       throw new UserError(
-        'hallAI is not configured for private conversation memory yet. Please ask the server owner to finish its setup.',
+        'Hall’s Discord connection is not configured yet. Please ask the server owner to finish setup.',
       );
     const match = /^(\d{15,22}):(\d{15,22}):(\d{15,22}):(private|public)$/.exec(key);
     if (!match)
@@ -34,6 +39,15 @@ export class Hallai {
     const response = await this.http.request('hallAI', new URL(path, this.url).href, body, 80_000, {
       Authorization: `Bearer ${this.apiKey}`,
     });
+    if (response.status === 401 || response.status === 403) {
+      safeLog(
+        'hallai_access_denied_check_worker_url_and_matching_integration_secrets',
+        new ServiceError('hallAI', response.status),
+      );
+      throw new UserError(
+        'Hall’s Discord connection was refused. Please ask the server owner to check its setup.',
+      );
+    }
     if (response.status === 429)
       throw new UserError(
         'You have reached Hall’s message limit. Please wait before trying again.',
