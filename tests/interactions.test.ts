@@ -300,6 +300,9 @@ test('answer splitting protects complete balanced, escaped and encoded citations
     String.raw`[escaped](https://example.com/path_\(example\))`,
     '[encoded](https://example.com/path_%28example%29)',
     '[angle](<https://example.com/path_(example>)',
+    '[1](<https://example.com/a b>)',
+    '[spaces](<https://example.com/a (b c) d>)',
+    '[tab](<https://example.com/a\tb>)',
     String.raw`[a\]b](https://example.com/path_(example))`,
   ];
   for (const citation of citations) {
@@ -319,6 +322,12 @@ test('answer splitting protects complete balanced, escaped and encoded citations
   assert.ok(chunks.some((chunk) => chunk.includes(citations[0]!)));
   assert.ok(chunks.some((chunk) => chunk.includes(citations[1]!)));
   assert.equal(chunks.join(''), 'x'.repeat(100) + adjacent);
+  const spaced = '[1](<https://example.com/' + 'a '.repeat(1100) + 'b>)';
+  assert.deepEqual(splitAnswer(spaced, 1800, 3500), ['The answer continues below.', spaced]);
+  assert.throws(
+    () => splitAnswer('[1](<https://example.com/' + 'a '.repeat(2100) + 'b>)'),
+    /source link/,
+  );
   const incomplete = '[1](https://example.com/path_(example)';
   assert.equal(
     splitAnswer('x'.repeat(100) + incomplete, 128).join(''),

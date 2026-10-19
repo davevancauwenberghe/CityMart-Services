@@ -110,7 +110,8 @@ export function splitAnswer(value: string, max = 3500, continuedMax = max): stri
       let angleDestination = /\]\(<https?:\/\/$/.test(token[0]);
       for (; end < value.length; end++) {
         const character = value[end]!;
-        if (/\s/.test(character)) break;
+        // Angle-wrapped destinations allow spaces and tabs, but not line endings.
+        if (/[\r\n]/.test(character) || (!angleDestination && /\s/.test(character))) break;
         if (character === '\\')
           end++; // Escaped delimiters do not affect balance.
         else if (angleDestination) {
