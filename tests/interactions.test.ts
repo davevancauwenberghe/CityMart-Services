@@ -8,11 +8,12 @@ import { info, help } from '../src/handlers/info.js';
 import { Citycraft } from '../src/handlers/citycraft.js';
 import { UserError } from '../src/core.js';
 import { splitAnswer, literal } from '../src/ui.js';
-import { Hallai } from '../src/services/hallai.js';
+import { Hallai, HallFailure } from '../src/services/hallai.js';
 import { HttpClient } from '../src/services/http.js';
+import { CitycraftStatus } from '../src/services/citycraft-status.js';
 import type { Roblox } from '../src/services/roblox.js';
 import type { Easypos } from '../src/services/easypos.js';
-import type { Minecraft } from '../src/services/minecraft.js';
+const hallReply = { reply: 'Answer', webSearch: false, contextFresh: false, truncated: false };
 const guildId = '100000000000000001',
   actor = '400000000000000001';
 const config = readConfig({ DISCORD_TOKEN: 'fake', GUILD_ID: guildId });
@@ -99,7 +100,7 @@ function assertEmbeds(payloads: Payload[]) {
       assert.ok((data.description?.length || 0) <= 4096);
       assert.ok(data.timestamp);
       assert.ok(data.color);
-      assert.ok(data.footer?.text.includes('v1.4.0'));
+      assert.ok(data.footer?.text.includes('v1.4.1'));
       total +=
         (data.title?.length || 0) +
         (data.description?.length || 0) +
@@ -133,18 +134,7 @@ const easypos = {
     playtime: { total: 'P'.repeat(3000), month: '1h', week: '1h', position: 1 },
     messages: { total: 5, month: 4, week: 3, position: 2 },
   }),
-  donations: async () => 42,
-  leaderboard: async () => [{ userId: 123, amount: 42 }],
 } as unknown as Easypos;
-const minecraft = {
-  lookup: async () => ({
-    name: 'Player',
-    model: 'Slim',
-    account: 'Java Edition',
-    skinUrl: 'https://textures.minecraft.net/texture/a',
-    capeUrl: null,
-  }),
-} as unknown as Minecraft;
 const client = {
   isReady: () => true,
   ws: { ping: 25 },
@@ -156,7 +146,7 @@ test('/ask includes the complete original question, respects embed budgets and k
   interaction.deferred = true;
   interaction.ephemeral = true;
   const ai = {
-    ask: async () => '```ts\n' + 'const x = 1;\n'.repeat(1200) + '```',
+    ask: async () => ({ ...hallReply, reply: '```ts\n' + 'const x = 1;\n'.repeat(1200) + '```' }),
   } as unknown as Hallai;
   await ask(interaction, ai);
   assertEmbeds(replies);
@@ -179,6 +169,40 @@ test('/ask failure still shows the user’s question in an embed', async () => {
   assert.match(replies[0]!.embeds[0]!.data.description!, /Please wait/);
   assert.match(replies[0]!.embeds[0]!.data.description!, /\*\*Status\*\*/);
   assert.doesNotMatch(replies[0]!.embeds[0]!.data.description!, /\*\*Hall’s answer\*\*/);
+});
+
+test('/ask includes safe Worker failure references without changing reply privacy', async () => {
+  const reference = '815ea786-e3ce-4e10-8e5c-466b8048314c';
+  const original = console.error;
+  console.error = () => {};
+  try {
+    for (const privateReply of [false, true]) {
+      const context = mockInteraction(
+        'ask',
+        { prompt: 'Check the sources' },
+        { private: privateReply },
+      );
+      const hallai = {
+        ask: async () => {
+          throw new HallFailure(503, reference);
+        },
+      } as unknown as Hallai;
+      const router = new Router(config, client, { hallai } as unknown as ConstructorParameters<
+        typeof Router
+      >[2]);
+      router.handle(context.interaction);
+      await Promise.all(router.pending);
+      assert.equal(context.interaction.ephemeral, privateReply);
+      assertEmbeds(context.replies);
+      assert.match(
+        context.replies[0]!.embeds[0]!.data.description!,
+        new RegExp('Reference: ' + reference),
+      );
+      assert.equal(context.replies[0]!.embeds.length, 1);
+    }
+  } finally {
+    console.error = original;
+  }
 });
 
 test('/ask setup failures keep one question/status embed and preserve the requested reply privacy', async (t) => {
@@ -231,15 +255,9 @@ test('all information and player command families produce branded embeds within 
     await help(interaction, section);
     assertEmbeds(replies);
   }
-  for (const command of [
-    'memberlookup',
-    'activity',
-    'donations',
-    'donationsleaderboard',
-    'minecraft',
-  ]) {
+  for (const command of ['memberlookup', 'activity']) {
     const { interaction, replies } = mockInteraction(command, { username: 'Player' });
-    await lookup(interaction, roblox, easypos, minecraft);
+    await lookup(interaction, roblox, easypos);
     assertEmbeds(replies);
   }
 });
@@ -255,26 +273,117 @@ test('long fenced answers remain bounded and user text cannot inject mentions', 
   assert.equal(literal('<@123> @everyone *hi*').includes('<@'), false);
 });
 
-test('router denies other servers and non-owner ranking changes with embedded errors', async () => {
-  const dependencies = { roblox, easypos, minecraft } as unknown as ConstructorParameters<
-    typeof Router
-  >[2];
-  for (const reason of ['guild', 'owner']) {
-    const { interaction, raw, replies } = mockInteraction('ranking', {
-      sub: 'promote',
-      username: 'Player',
-    });
-    if (reason === 'guild') raw.guildId = '100000000000000002';
-    else raw.guild.ownerId = '400000000000000002';
-    const router = new Router(config, client, dependencies);
-    router.handle(interaction);
-    await Promise.all(router.pending);
-    assertEmbeds(replies);
-    assert.match(
-      replies[0]!.embeds[0]!.data.description!,
-      reason === 'guild' ? /only in the CityMart server/ : /Only this server’s owner/,
-    );
+test('answer splitting preserves source links, small first-embed budgets and surrogate pairs', () => {
+  const citation = '[1](https://example.com/reference?details=' + 'a'.repeat(700) + ')';
+  for (const prefix of ['Useful context about the question. '.repeat(99), '😀'.repeat(1720)]) {
+    const text = prefix + citation;
+    const chunks = splitAnswer(text, 3500);
+    assert.ok(chunks.every((chunk) => chunk.length <= 3500));
+    assert.ok(chunks.some((chunk) => chunk.includes(citation)));
+    assert.equal(chunks.join(''), text);
+    assert.ok(chunks.every((chunk) => !/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/.test(chunk)));
   }
+  const long = '[1](https://example.com/' + 'a'.repeat(2200) + ')';
+  const chunks = splitAnswer(long, 1800, 3500);
+  assert.equal(chunks[0], 'The answer continues below.');
+  assert.equal(chunks[1], long);
+  assert.throws(
+    () => splitAnswer('[1](https://example.com/' + 'a'.repeat(4000) + ')'),
+    /source link/,
+  );
+});
+
+test('/ask labels search/fresh context, explains truncation and attaches answers whose links exceed embed limits', async () => {
+  for (const oversized of [false, true]) {
+    const context = mockInteraction('ask', { prompt: 'Search official sources' });
+    context.raw.deferred = true;
+    const reply = oversized
+      ? '[1](https://example.com/' + 'a'.repeat(4000) + ')'
+      : 'A sourced reply [1](https://example.com/reference).';
+    await ask(context.interaction, {
+      ask: async () => ({
+        ...hallReply,
+        reply,
+        webSearch: true,
+        contextFresh: true,
+        truncated: true,
+      }),
+    } as unknown as Hallai);
+    assertEmbeds(context.replies);
+    const first = context.replies[0]!;
+    assert.match(first.embeds[0]!.data.description!, /Search official sources/);
+    assert.match(first.embeds[0]!.data.footer!.text, /Web search used.*Fresh context/);
+    if (oversized) {
+      const files = (first as unknown as { files: { attachment: Buffer }[] }).files;
+      assert.ok(files[0]!.attachment.toString().includes(reply));
+    } else {
+      assert.match(first.embeds[0]!.data.footer!.text, /Web search used.*Fresh context/);
+      assert.match(first.embeds[0]!.data.description!, /Hall reached its reply limit/);
+    }
+  }
+});
+
+test('/citycraft defers once, shows status and opens its form only through the request button', async () => {
+  for (const state of ['online', 'unreachable'] as const) {
+    const context = mockInteraction('citycraft');
+    const status = new CitycraftStatus({ host: '127.0.0.1', port: 25565 }, async () => {
+      assert.equal(context.raw.deferred, true);
+      return {
+        state,
+        checkedAt: Date.now(),
+        ...(state === 'online'
+          ? { players: { online: 3, max: 20 }, version: 'Paper', latencyMs: 5 }
+          : {}),
+      };
+    });
+    const citycraft = new Citycraft(client, config, status);
+    let opened = false;
+    context.raw.showModal = async () => {
+      opened = true;
+      return {};
+    };
+    const router = new Router(config, client, { citycraft } as unknown as ConstructorParameters<
+      typeof Router
+    >[2]);
+    router.handle(context.interaction);
+    await Promise.all(router.pending);
+    assert.equal(opened, false);
+    assertEmbeds(context.replies);
+    const fields = context.replies[0]!.embeds[0]!.data.fields!;
+    assert.equal(
+      fields.find((field) => field.name === 'Server status')!.value,
+      state === 'online' ? 'Online' : 'Offline or unreachable',
+    );
+    const button = (
+      context.replies[0]!.components![0] as {
+        toJSON: () => { components: { custom_id: string }[] };
+      }
+    ).toJSON().components[0]!;
+    assert.equal(button.custom_id, 'citycraft_whitelist_request');
+    context.raw.id = '600000000000000002';
+    Object.assign(context.raw, {
+      isChatInputCommand: () => false,
+      isButton: () => true,
+      customId: button.custom_id,
+      deferred: false,
+      replied: false,
+    });
+    router.handle(context.interaction);
+    await Promise.all(router.pending);
+    assert.equal(opened, true);
+  }
+});
+
+test('router denies commands from other servers with an embedded error', async () => {
+  const { interaction, raw, replies } = mockInteraction('activity', { username: 'Player' });
+  raw.guildId = '100000000000000002';
+  const router = new Router(config, client, { roblox, easypos } as unknown as ConstructorParameters<
+    typeof Router
+  >[2]);
+  router.handle(interaction);
+  await Promise.all(router.pending);
+  assertEmbeds(replies);
+  assert.match(replies[0]!.embeds[0]!.data.description!, /only in the CityMart server/);
 });
 
 test('router acknowledges network commands before calling the integration and ignores replayed interactions', async () => {
@@ -291,7 +400,6 @@ test('router acknowledges network commands before calling the integration and ig
   const router = new Router(config, client, {
     roblox: checked,
     easypos,
-    minecraft,
   } as unknown as ConstructorParameters<typeof Router>[2]);
   router.handle(context.interaction);
   await Promise.all(router.pending);
@@ -345,7 +453,7 @@ test('private and public /ask requests use separate context identifiers', async 
   const ai = {
     ask: async (key: string) => {
       keys.push(key);
-      return 'Answer';
+      return hallReply;
     },
   } as unknown as Hallai;
   for (const privateReply of [false, true]) {
@@ -382,6 +490,18 @@ test('CityCraft delivers an embedded whitelist request once and confirms it priv
     customId,
     fields: { getTextInputValue: () => 'TestPlayer', getStringSelectValues: () => ['java'] },
   } as unknown as Parameters<Citycraft['submit']>[0];
+  await assert.rejects(
+    citycraft.submit({
+      ...submit,
+      user: { ...submit.user, id: '400000000000000002' },
+    } as typeof submit),
+    /form expired/,
+  );
+  await assert.rejects(
+    citycraft.submit({ ...submit, guildId: '100000000000000002' } as typeof submit),
+    /form expired/,
+  );
+  assert.equal(sent.length, 0);
   await citycraft.submit(submit);
   assertEmbeds(sent);
   assertEmbeds(context.replies);
@@ -392,7 +512,7 @@ test('CityCraft delivers an embedded whitelist request once and confirms it priv
 test('/ask puts the question and a normal answer in one embed', async () => {
   const context = mockInteraction('ask', { prompt: 'How are you?' });
   await ask(context.interaction, {
-    ask: async () => 'Ready for a good question.',
+    ask: async () => ({ ...hallReply, reply: 'Ready for a good question.' }),
   } as unknown as Hallai);
   assert.equal(context.replies.length, 1);
   assert.equal(context.replies[0]!.embeds.length, 1);

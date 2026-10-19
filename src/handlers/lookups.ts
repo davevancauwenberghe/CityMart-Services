@@ -1,10 +1,10 @@
 import { MessageFlags, type ChatInputCommandInteraction } from 'discord.js';
+import { VERSION } from '../config.js';
 import { UserError, safeLog } from '../core.js';
 import { embed, links, respond, literal, clip, message, splitAnswer } from '../ui.js';
 import type { Roblox, RobloxUser } from '../services/roblox.js';
 import type { Easypos } from '../services/easypos.js';
-import type { Minecraft } from '../services/minecraft.js';
-import type { Hallai } from '../services/hallai.js';
+import { HallFailure, type Hallai, type HallReply } from '../services/hallai.js';
 
 const profileUrl = (id: number) => `https://www.roblox.com/users/${id}/profile`;
 const fmt = (value: number | null) => (value === null ? 'Not available' : value.toLocaleString());
@@ -23,55 +23,8 @@ export async function lookup(
   interaction: ChatInputCommandInteraction,
   roblox: Roblox,
   easypos: Easypos,
-  minecraft: Minecraft,
 ) {
   const command = interaction.commandName;
-  if (command === 'minecraft') {
-    const player = await minecraft.lookup(
-      interaction.options.getString('username', true).trim(),
-      interaction.user.id,
-    );
-    const result = embed(
-      `${literal(player.name)} • Minecraft`,
-      'Minecraft Java Edition player profile.',
-      'minecraft',
-    ).addFields(
-      { name: 'Account', value: player.account, inline: true },
-      { name: 'Skin model', value: player.model, inline: true },
-      { name: 'Cape', value: player.capeUrl ? 'Available' : 'No cape found', inline: true },
-    );
-    if (player.skinUrl) result.setImage(player.skinUrl);
-    return respond(
-      interaction,
-      [result],
-      player.skinUrl || player.capeUrl
-        ? [
-            links(
-              ...([
-                player.skinUrl ? ['Open skin texture', player.skinUrl] : null,
-                player.capeUrl ? ['Open cape texture', player.capeUrl] : null,
-              ].filter(Boolean) as [string, string][]),
-            ),
-          ]
-        : [],
-    );
-  }
-  if (command === 'donationsleaderboard') {
-    const entries = await easypos.leaderboard();
-    const rows = await Promise.all(
-      entries.map(async (entry, index) => {
-        const user = await roblox.profile(entry.userId).catch(() => null);
-        return `**${index + 1}.** [${literal(user?.name || `User ${entry.userId}`)}](${profileUrl(entry.userId)}) — **R$ ${entry.amount.toLocaleString()}**`;
-      }),
-    );
-    return respond(interaction, [
-      embed(
-        'CityMart’s top donors',
-        rows.join('\n') || 'No donations have been recorded yet.',
-        'roblox',
-      ),
-    ]);
-  }
   const user = await roblox.lookup(interaction.options.getString('username', true).trim());
   const buttons = [links(['Roblox profile', profileUrl(user.id)])];
   if (command === 'memberlookup') {
@@ -95,20 +48,6 @@ export async function lookup(
             inline: true,
           },
           { name: 'Roblox ID', value: String(user.id), inline: true },
-        ),
-      ],
-      buttons,
-    );
-  }
-  if (command === 'donations') {
-    const amount = await easypos.donations(user.id);
-    return respond(
-      interaction,
-      [
-        profileEmbed(
-          user,
-          'CityMart donations',
-          `Thank you for supporting CityMart!\n\n**Total donated: R$ ${amount.toLocaleString()}**`,
         ),
       ],
       buttons,
@@ -151,7 +90,7 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
     iconURL: interaction.user.displayAvatarURL(),
   };
   const key = `${interaction.guildId}:${interaction.channelId}:${interaction.user.id}:${interaction.ephemeral ? 'private' : 'public'}`;
-  let answer: string;
+  let answer: HallReply;
   try {
     answer = await hallai.ask(key, prompt, interaction.options.getBoolean('reset') || false);
   } catch (error) {
@@ -163,7 +102,10 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
           '**Status**\n' +
           (error instanceof UserError
             ? error.message
-            : 'Your question could not be answered right now. Please try again shortly.'),
+            : 'Your question could not be answered right now. Please try again shortly.' +
+              (error instanceof HallFailure && error.reference
+                ? `\nReference: ${error.reference}`
+                : '')),
         'error',
       )
         .setAuthor(author)
@@ -171,7 +113,43 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
     ]);
     return;
   }
-  const chunks = splitAnswer(answer, Math.min(3500, 4096 - answerIntro.length));
+  const text =
+    answer.reply +
+    (answer.truncated ? '\n\n*Hall reached its reply limit. Ask a follow-up to continue.*' : '');
+  const status = [
+    answer.webSearch ? 'Web search used' : '',
+    answer.contextFresh ? 'Fresh context' : '',
+    answer.safety === 'redirected'
+      ? 'Safer direction'
+      : answer.safety === 'support'
+        ? 'Support'
+        : '',
+  ].filter(Boolean);
+  const footer = {
+    text: `CityMart Services • hallAI • v${VERSION}${status.length ? ' • ' + status.join(' • ') : ''}`,
+  };
+  let chunks: string[];
+  try {
+    chunks = splitAnswer(text, Math.min(3500, 4096 - answerIntro.length), 3500);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // Some valid URLs exceed Discord's embed budget. Preserve the complete
+    // answer in an attachment instead of silently cutting a citation in half.
+    await interaction.editReply({
+      ...message([
+        embed(
+          'hallAI’s answer',
+          answerIntro + 'A source link is too long for an embed. The complete answer is attached.',
+          'ai',
+        )
+          .setAuthor(author)
+          .setThumbnail(null)
+          .setFooter(footer),
+      ]),
+      files: [{ attachment: Buffer.from(text, 'utf8'), name: 'hall-answer.md' }],
+    });
+    return;
+  }
   const answerEmbed = (text: string, index: number) =>
     embed(
       index ? `hallAI • continued (${index + 1}/${chunks.length})` : 'hallAI’s answer',
@@ -179,7 +157,8 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
       'ai',
     )
       .setAuthor(author)
-      .setThumbnail(null);
+      .setThumbnail(null)
+      .setFooter(footer);
   await respond(interaction, [answerEmbed(chunks[0]!, 0)]);
   for (let index = 1; index < chunks.length; index++)
     await interaction.followUp({

@@ -3,22 +3,13 @@ import assert from 'node:assert/strict';
 import { HttpClient } from '../src/services/http.js';
 import { Roblox } from '../src/services/roblox.js';
 import { Easypos } from '../src/services/easypos.js';
-import {
-  Minecraft,
-  decodeTextureProperty,
-  isMinecraftUsername,
-  normaliseTextureUrl,
-} from '../src/services/minecraft.js';
-import { Hallai } from '../src/services/hallai.js';
+import { Hallai, HallFailure } from '../src/services/hallai.js';
 import { readConfig } from '../src/config.js';
 import { UserError } from '../src/core.js';
 const config = readConfig({
   DISCORD_TOKEN: 'fake',
   GUILD_ID: '100000000000000001',
   EASYPOS_TOKEN: 'activity-key',
-  EASYPOS_DONATIONS_TOKEN: 'donation-key',
-  EASYPOS_RANKING_TOKEN: 'ranking-key',
-  EASYPOS_RANKING_MOD_ID: '123',
 });
 const http = () => new HttpClient('test');
 const json = (value: unknown) => new Response(JSON.stringify(value), { status: 200 });
@@ -54,85 +45,82 @@ test('Roblox profile survives a thumbnail outage and handles absent community me
   assert.equal(await roblox.role(123), null);
 });
 
-test('easyPOS preserves POST contracts and never exposes upstream error bodies', async (t) => {
-  const requests: { url: string; body: Record<string, unknown> }[] = [];
+test('easyPOS activity keeps its POST contract and safe field validation', async (t) => {
   t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
-    requests.push({ url, body: JSON.parse(init.body as string) });
+    assert.equal(url, 'https://papi.easypos.lol/activity/data');
     assert.equal(init.method, 'POST');
-    if (url.includes('leaderboard'))
-      return json({ success: true, data: { donations: [{ userId: '123', amount: 10 }] } });
-    if (url.includes('ranking')) return json({ success: true, data: { rank: 'Manager' } });
-    return json({ success: true, data: { amount: 42 } });
-  });
-  const easypos = new Easypos(http(), config);
-  assert.equal(await easypos.donations(123), 42);
-  assert.deepEqual(await easypos.leaderboard(), [{ userId: 123, amount: 10 }]);
-  assert.equal(await easypos.rank('promote', 123, 'SC'), 'Manager');
-  assert.deepEqual(requests[2]!.body, {
-    token: 'ranking-key',
-    userId: 123,
-    modId: 123,
-    scaleCode: 'SC',
-  });
-  assert.ok(requests[0]!.url.endsWith('/donations/lookup'));
-});
-
-test('malformed donation amounts fail safely and ranking timeouts are never retried', async (t) => {
-  let requests = 0;
-  t.mock.method(globalThis, 'fetch', async (url: string) => {
-    requests++;
-    if (url.includes('ranking')) throw new Error('token=SECRET');
-    return json({ success: true, data: { amount: 'untrusted' } });
-  });
-  const easypos = new Easypos(http(), config);
-  await assert.rejects(easypos.donations(123), /easyPOS request failed/);
-  await assert.rejects(easypos.rank('demote', 123, null), /may already have been applied/);
-  assert.equal(requests, 2);
-});
-
-test('Minecraft validates usernames and only accepts Mojang HTTP(S) texture URLs', () => {
-  assert.ok(isMinecraftUsername('jeb_'));
-  assert.equal(isMinecraftUsername('853c80ef3c3749fdaa49938b674adae6'), false);
-  for (const url of [
-    'https://evil.example/texture/a',
-    'ftp://textures.minecraft.net/texture/a',
-    'https://u:p@textures.minecraft.net/texture/a',
-    'https://textures.minecraft.net:444/texture/a',
-  ])
-    assert.equal(normaliseTextureUrl(url), null);
-  const value = Buffer.from(
-    JSON.stringify({
-      textures: {
-        SKIN: { url: 'http://textures.minecraft.net/texture/skin', metadata: { model: 'slim' } },
-        CAPE: { url: 'https://textures.minecraft.net/texture/cape' },
+    assert.deepEqual(JSON.parse(init.body as string), { token: 'activity-key', userId: 123 });
+    return json({
+      success: true,
+      data: {
+        inGame: true,
+        playtime: { formatted: { total: '2h' }, position: 1 },
+        messages: { total: 4 },
       },
-    }),
-  ).toString('base64');
-  assert.deepEqual(decodeTextureProperty(value), {
-    skinUrl: 'https://textures.minecraft.net/texture/skin',
-    capeUrl: 'https://textures.minecraft.net/texture/cape',
-    model: 'Slim (Alex)',
+    });
   });
-  assert.throws(() => decodeTextureProperty('not JSON'), /Mojang request failed/);
+  const data = await new Easypos(http(), config).activity(123);
+  assert.equal(data.inGame, true);
+  assert.equal(data.playtime.total, '2h');
+  assert.equal(data.messages.total, 4);
+  assert.equal(data.playtime.month, 'Not available');
 });
 
-test('Minecraft caches the complete lookup and never returns a UUID in its public profile', async (t) => {
-  let requests = 0;
-  t.mock.method(globalThis, 'fetch', async (url: string) => {
-    requests++;
-    return url.includes('/lookup/')
-      ? json({ id: 'a'.repeat(32), name: 'Player' })
-      : json({ properties: [] });
-  });
-  const minecraft = new Minecraft(http());
-  const first = await minecraft.lookup('Player', 'actor');
-  await minecraft.lookup('Player', 'actor');
-  assert.equal(first.name, 'Player');
-  assert.equal(requests, 2);
-  assert.equal('id' in first, false);
+test('easyPOS activity failures never expose upstream response bodies', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('SECRET_TOKEN', { status: 500 }));
+  await assert.rejects(
+    new Easypos(http(), config).activity(123),
+    (error) => error instanceof Error && !error.message.includes('SECRET_TOKEN'),
+  );
 });
 
 const hallKey = '100000000000000001:200000000000000001:400000000000000001:public';
+
+test('Hall retains safe search/context/truncation metadata and rejects oversized replies without cutting source links', async (t) => {
+  let reply = 'See [1](https://example.com/source).';
+  t.mock.method(globalThis, 'fetch', async () =>
+    json({
+      reply,
+      memory: 'session',
+      web_search: true,
+      context_fresh: true,
+      truncated: true,
+      safety: 'checked',
+      request_id: '23d8bccc-8827-42c3-88af-0a67efcbd6ea',
+    }),
+  );
+  const ai = new Hallai(http(), 'https://example.com', 'integration-secret');
+  assert.deepEqual(await ai.ask(hallKey, 'Search please'), {
+    reply,
+    webSearch: true,
+    contextFresh: true,
+    truncated: true,
+    safety: 'checked',
+    requestId: '23d8bccc-8827-42c3-88af-0a67efcbd6ea',
+  });
+  reply = 'a'.repeat(16_001);
+  await assert.rejects(ai.ask(hallKey, 'Oversized'), /hallAI request failed/);
+});
+
+test('Hall error references are allowlisted independently from untrusted error messages', async (t) => {
+  let reference = '23d8bccc-8827-42c3-88af-0a67efcbd6ea';
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ request_id: reference, error: { message: 'SECRET_BODY' } }, { status: 503 }),
+  );
+  const ai = new Hallai(http(), 'https://example.com', 'integration-secret');
+  await assert.rejects(
+    ai.ask(hallKey, 'Question'),
+    (error) =>
+      error instanceof HallFailure &&
+      error.reference === reference &&
+      !error.message.includes('SECRET_BODY'),
+  );
+  reference = 'SECRET_BAD_ID';
+  await assert.rejects(
+    ai.ask(hallKey, 'Question'),
+    (error) => error instanceof HallFailure && error.reference === undefined,
+  );
+});
 
 test('Hall setup warnings identify incomplete runtime configuration without exposing credentials', () => {
   assert.equal(new Hallai(http(), '').configurationWarning, undefined);

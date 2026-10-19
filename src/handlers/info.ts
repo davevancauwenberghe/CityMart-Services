@@ -15,7 +15,7 @@ import type { Roblox } from '../services/roblox.js';
 const helpSections = {
   overview: [
     'Welcome to CityMart',
-    'Use the menu below to explore services. All features use slash commands; ordinary messages do not trigger the bot.\n\n**Community:** links, support, member profiles and community size.\n**Players:** Roblox activity, donations and Minecraft profiles.\n**Tools:** hallAI, CityCraft and giveaways.\n**Owner:** ranking and giveaway management.',
+    'Use the menu below to explore services. All features use slash commands; ordinary messages do not trigger the bot.\n\n**Community:** links, support, member profiles and community size.\n**Players:** Roblox profiles and activity.\n**Tools:** hallAI, CityCraft and giveaways.\n**Owner:** giveaway management.',
   ],
   community: [
     'Community & support',
@@ -23,15 +23,15 @@ const helpSections = {
   ],
   players: [
     'Player services',
-    '`/memberlookup username` — Roblox profile and CityMart role\n`/activity username` — playtime and message activity\n`/donations username` — donation total\n`/donationsleaderboard` — top ten donors\n`/minecraft player username` — Java Edition skin and cape\n\nUse account usernames rather than display names. Minecraft UUID lookup is not available.',
+    '`/memberlookup username` — Roblox profile and CityMart role\n`/activity username` — playtime and message activity\n\nUse account usernames rather than display names.',
   ],
   tools: [
     'Tools & events',
-    '`/ask prompt [private] [reset]` — hallAI with your question and answer in one embed. Hall remembers up to 12 exchanges for 24 hours of inactivity, separately for each member, channel and reply mode. Use reset for a new conversation.\n`/forget [private]` — delete your Hall context in this channel; confirmation is private.\n`/citycraft info` — server details\n`/citycraft request` — request whitelist access\n`/giveaway list` — active and recent giveaways\n`/giveaway entries message_id` — browse entries\n\nUse the **Enter giveaway** button on an active giveaway to join.',
+    '`/ask prompt [private] [reset]` — hallAI with your question and answer in one embed. Hall remembers up to 12 exchanges for 24 hours of inactivity, separately for each member, channel and reply mode. Use reset for a new conversation. Hall can search the public web when useful and includes clickable sources. Web-search and fresh-context labels appear when relevant. Keep private details out of search requests.\n`/forget [private]` — delete your Hall context in this channel; confirmation is private.\n`/citycraft` — server status, player count and a button to request whitelist access\n`/giveaway list` — active and recent giveaways\n`/giveaway entries message_id` — browse entries\n\nUse the **Enter giveaway** button on an active giveaway to join.',
   ],
   owner: [
     'Server owner tools',
-    '`/giveaway start prize duration:2h` — start a giveaway\n`/giveaway start prize end:2026-12-20 18:00` — use the configured time zone instead\n`/giveaway end message_id` — draw early or retry a pending announcement\n`/giveaway reroll message_id` — choose a different winner\n`/giveaway removeentrant message_id user` — remove an entrant\n`/ranking promote username [scale_code]`\n`/ranking demote username`\n\nOnly this server’s owner can change ranks or manage giveaways. No automated retry is performed for ranking changes.',
+    '`/giveaway start prize duration:2h` — start a giveaway\n`/giveaway start prize end:2026-12-20 18:00` — use the configured time zone instead\n`/giveaway end message_id` — draw early or retry a pending announcement\n`/giveaway reroll message_id` — choose a different winner\n`/giveaway removeentrant message_id user` — remove an entrant\n\nOnly this server’s owner can manage giveaways.',
   ],
 } as const;
 export async function help(

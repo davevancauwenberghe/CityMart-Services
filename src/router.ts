@@ -1,18 +1,12 @@
-import type { Client, Interaction, ChatInputCommandInteraction } from 'discord.js';
+import type { Client, Interaction } from 'discord.js';
 import type { Config } from './config.js';
 import { RateLimit, UserError, safeLog } from './core.js';
-import { defer, respond, respondError, embed, literal } from './ui.js';
+import { defer, respondError } from './ui.js';
 import { info, help } from './handlers/info.js';
 import { lookup, ask, forget } from './handlers/lookups.js';
-import {
-  giveawayCommand,
-  giveawayButton,
-  autocomplete,
-  requireOwner,
-} from './handlers/giveaways.js';
+import { giveawayCommand, giveawayButton, autocomplete } from './handlers/giveaways.js';
 import type { Roblox } from './services/roblox.js';
 import type { Easypos } from './services/easypos.js';
-import type { Minecraft } from './services/minecraft.js';
 import type { Hallai } from './services/hallai.js';
 import type { Giveaways } from './giveaways/service.js';
 import type { Citycraft } from './handlers/citycraft.js';
@@ -20,7 +14,6 @@ import type { Citycraft } from './handlers/citycraft.js';
 export class Router {
   private recent = new Map<string, number>();
   private limits = new RateLimit(20, 60_000);
-  private ranking = new Set<number>();
   readonly pending = new Set<Promise<void>>();
   stopping = false;
   constructor(
@@ -29,7 +22,6 @@ export class Router {
     private readonly services: {
       roblox: Roblox;
       easypos: Easypos;
-      minecraft: Minecraft;
       hallai: Hallai;
       giveaways: Giveaways;
       citycraft: Citycraft;
@@ -89,23 +81,10 @@ export class Router {
           return await this.services.citycraft.submit(interaction);
         throw new UserError('This form has expired. Please open a new form from the command.');
       }
-      if (
-        interaction.commandName === 'citycraft' &&
-        interaction.options.getSubcommand(false) === 'request'
-      )
-        return await this.services.citycraft.show(interaction);
       const privateReply =
-        [
-          'help',
-          'about',
-          'ping',
-          'support',
-          'citycraft',
-          'user',
-          'giveaway',
-          'ranking',
-          'forget',
-        ].includes(interaction.commandName) ||
+        ['help', 'about', 'ping', 'support', 'citycraft', 'user', 'giveaway', 'forget'].includes(
+          interaction.commandName,
+        ) ||
         (interaction.commandName === 'ask' && interaction.options.getBoolean('private') === true);
       await defer(interaction, privateReply);
       if (interaction.commandName === 'ask') return await ask(interaction, this.services.hallai);
@@ -115,18 +94,8 @@ export class Router {
         return await this.services.citycraft.info(interaction);
       if (interaction.commandName === 'giveaway')
         return await giveawayCommand(interaction, this.services.giveaways, this.config);
-      if (interaction.commandName === 'ranking') return await this.rank(interaction);
-      if (
-        ['memberlookup', 'activity', 'donations', 'donationsleaderboard', 'minecraft'].includes(
-          interaction.commandName,
-        )
-      )
-        return await lookup(
-          interaction,
-          this.services.roblox,
-          this.services.easypos,
-          this.services.minecraft,
-        );
+      if (['memberlookup', 'activity'].includes(interaction.commandName))
+        return await lookup(interaction, this.services.roblox, this.services.easypos);
       await info(interaction, this.config, this.client, this.services.roblox);
     } catch (error) {
       if (!(error instanceof UserError)) safeLog('interaction_failed', error);
@@ -137,34 +106,6 @@ export class Router {
       } catch (replyError) {
         safeLog('interaction_reply_failed', replyError);
       }
-    }
-  }
-  private async rank(interaction: ChatInputCommandInteraction) {
-    requireOwner(interaction);
-    const action = interaction.options.getSubcommand();
-    if (action !== 'promote' && action !== 'demote')
-      throw new UserError('Choose promote or demote.');
-    const user = await this.services.roblox.lookup(
-      interaction.options.getString('username', true).trim(),
-    );
-    if (this.ranking.has(user.id))
-      throw new UserError('A rank change for that user is already in progress. Please wait.');
-    this.ranking.add(user.id);
-    try {
-      const rank = await this.services.easypos.rank(
-        action,
-        user.id,
-        interaction.options.getString('scale_code') || interaction.options.getString('scalecode'),
-      );
-      await respond(interaction, [
-        embed(
-          'Roblox rank updated',
-          `**${literal(user.name)}** was ${action === 'promote' ? 'promoted' : 'demoted'}.\n\n**New rank:** ${literal(rank)}`,
-          'success',
-        ),
-      ]);
-    } finally {
-      this.ranking.delete(user.id);
     }
   }
 }

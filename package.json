@@ -1,11 +1,11 @@
 {
   "name": "citymart-bot",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "CityMart Services: slash commands, community services and giveaways",
   "type": "module",
   "engines": {
-    "node": ">=24 <25"
+    "node": "^24.15.0 || ^26.0.0"
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env dist/main.js",

@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { IANAZone } from 'luxon';
 
-export const VERSION = '1.4.0';
+export const VERSION = '1.4.1';
 export const isSnowflake = (value: string) => /^[1-9]\d{16,19}$/.test(value);
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env) {
@@ -33,12 +33,16 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   const groupId = env.ROBLOX_GROUP_ID?.trim() || '36060455';
   if (!/^[1-9]\d{0,14}$/.test(groupId) || !Number.isSafeInteger(Number(groupId)))
     throw new Error('Invalid ROBLOX_GROUP_ID.');
-  const rankingModId = env.EASYPOS_RANKING_MOD_ID?.trim() || '';
+  const citycraftStatusHost = env.CITYCRAFT_STATUS_HOST?.trim() || '157.173.101.60';
+  if (!/^[a-zA-Z0-9.:-]{1,253}$/.test(citycraftStatusHost))
+    throw new Error('Invalid CITYCRAFT_STATUS_HOST.');
+  const citycraftStatusPort = Number(env.CITYCRAFT_STATUS_PORT || 25565);
   if (
-    rankingModId &&
-    (!/^[1-9]\d{0,14}$/.test(rankingModId) || !Number.isSafeInteger(Number(rankingModId)))
+    !Number.isInteger(citycraftStatusPort) ||
+    citycraftStatusPort < 1 ||
+    citycraftStatusPort > 65535
   )
-    throw new Error('Invalid EASYPOS_RANKING_MOD_ID.');
+    throw new Error('Invalid CITYCRAFT_STATUS_PORT.');
   const guildId = id('GUILD_ID');
   if (!guildId) throw new Error('Missing GUILD_ID.');
   return {
@@ -57,10 +61,9 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     minRoleId: id('GIVEAWAY_MIN_ROLE_ID'),
     citycraftOwnerId: id('CITYCRAFT_OWNER_USER_ID', '651525636351066182'),
     citycraftAddress: env.CITYCRAFT_ADDRESS?.trim() || 'citycraft.davevancauwenberghe.be',
+    citycraftStatusHost,
+    citycraftStatusPort,
     easyposToken: env.EASYPOS_TOKEN?.trim() || '',
-    donationsToken: env.EASYPOS_DONATIONS_TOKEN?.trim() || '',
-    rankingToken: env.EASYPOS_RANKING_TOKEN?.trim() || '',
-    rankingModId,
     userAgent:
       env.USER_AGENT?.trim() ||
       `CityMart-Services/${VERSION} (+https://github.com/davevancauwenberghe/CityMart-Services)`,
