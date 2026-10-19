@@ -293,6 +293,66 @@ test('answer splitting preserves source links, small first-embed budgets and sur
   );
 });
 
+test('answer splitting protects complete balanced, escaped and encoded citations at every internal boundary', () => {
+  const citations = [
+    '[1](https://en.wikipedia.org/wiki/Test_(example))',
+    '[nested](https://example.com/path_(outer_(inner)))',
+    String.raw`[escaped](https://example.com/path_\(example\))`,
+    '[encoded](https://example.com/path_%28example%29)',
+    '[angle](<https://example.com/path_(example>)',
+    String.raw`[a\]b](https://example.com/path_(example))`,
+  ];
+  for (const citation of citations) {
+    for (let boundary = 1; boundary < citation.length; boundary++) {
+      const text = 'x'.repeat(122 - boundary) + citation + ' trailing text';
+      const chunks = splitAnswer(text, 128);
+      assert.ok(
+        chunks.some((chunk) => chunk.includes(citation)),
+        `Broken citation at ${boundary}: ${citation}`,
+      );
+      assert.equal(chunks.join(''), text);
+      assert.ok(chunks.every((chunk) => chunk.length <= 128));
+    }
+  }
+  const adjacent = citations[0]! + citations[1]! + ' after the sources';
+  const chunks = splitAnswer('x'.repeat(100) + adjacent, 128);
+  assert.ok(chunks.some((chunk) => chunk.includes(citations[0]!)));
+  assert.ok(chunks.some((chunk) => chunk.includes(citations[1]!)));
+  assert.equal(chunks.join(''), 'x'.repeat(100) + adjacent);
+  const incomplete = '[1](https://example.com/path_(example)';
+  assert.equal(
+    splitAnswer('x'.repeat(100) + incomplete, 128).join(''),
+    'x'.repeat(100) + incomplete,
+  );
+});
+
+test('/ask surfaces each Worker safety value in normal, continued and attachment reply footers', async () => {
+  for (const [safety, label] of [
+    ['checked', 'Safety checked'],
+    ['redirected', 'Safer direction'],
+    ['support', 'Support'],
+    [undefined, undefined],
+  ] as const) {
+    for (const reply of [
+      'A short answer.',
+      'A long answer. '.repeat(400),
+      '[1](https://example.com/' + 'a'.repeat(4000) + ')',
+    ]) {
+      const context = mockInteraction('ask', { prompt: 'Question' });
+      context.raw.deferred = true;
+      await ask(context.interaction, {
+        ask: async () => ({ ...hallReply, reply, safety }),
+      } as unknown as Hallai);
+      assertEmbeds(context.replies);
+      for (const response of context.replies) {
+        const footer = response.embeds[0]!.data.footer!.text;
+        if (label) assert.ok(footer.endsWith(' • ' + label));
+        else assert.doesNotMatch(footer, /Safety checked|Safer direction|Support/);
+      }
+    }
+  }
+});
+
 test('/ask labels search/fresh context, explains truncation and attaches answers whose links exceed embed limits', async () => {
   for (const oversized of [false, true]) {
     const context = mockInteraction('ask', { prompt: 'Search official sources' });
@@ -323,11 +383,12 @@ test('/ask labels search/fresh context, explains truncation and attaches answers
   }
 });
 
-test('/citycraft defers once, shows status and opens its form only through the request button', async () => {
+test('/citycraft defers publicly, shows status and opens its form only through the request button', async () => {
   for (const state of ['online', 'unreachable'] as const) {
     const context = mockInteraction('citycraft');
     const status = new CitycraftStatus({ host: '127.0.0.1', port: 25565 }, async () => {
       assert.equal(context.raw.deferred, true);
+      assert.equal(context.raw.ephemeral, false);
       return {
         state,
         checkedAt: Date.now(),
@@ -348,6 +409,8 @@ test('/citycraft defers once, shows status and opens its form only through the r
     router.handle(context.interaction);
     await Promise.all(router.pending);
     assert.equal(opened, false);
+    assert.equal(context.raw.ephemeral, false);
+    assert.equal(context.acknowledgements.length, 1);
     assertEmbeds(context.replies);
     const fields = context.replies[0]!.embeds[0]!.data.fields!;
     assert.equal(
@@ -372,6 +435,68 @@ test('/citycraft defers once, shows status and opens its form only through the r
     await Promise.all(router.pending);
     assert.equal(opened, true);
   }
+});
+
+test('another member can use a public CityCraft button and receive a private whitelist confirmation', async () => {
+  const sent: Payload[] = [];
+  const bot = {
+    users: {
+      fetch: async () => ({
+        send: async (payload: Payload) => {
+          sent.push(payload);
+        },
+      }),
+    },
+  } as unknown as Client;
+  const status = new CitycraftStatus({ host: '127.0.0.1', port: 25565 }, async () => ({
+    state: 'unreachable',
+    checkedAt: Date.now(),
+  }));
+  const citycraft = new Citycraft(bot, config, status);
+  const router = new Router(config, bot, { citycraft } as unknown as ConstructorParameters<
+    typeof Router
+  >[2]);
+  const command = mockInteraction('citycraft');
+  router.handle(command.interaction);
+  await Promise.all(router.pending);
+  assert.equal(command.raw.ephemeral, false);
+  const button = mockInteraction('citycraft');
+  button.raw.user.id = '400000000000000002';
+  button.raw.user.toString = () => `<@${button.raw.user.id}>`;
+  let customId = '';
+  button.raw.showModal = async (builder) => {
+    assert.equal(button.raw.deferred, false);
+    customId = (builder.toJSON() as { custom_id: string }).custom_id;
+    return {};
+  };
+  Object.assign(button.raw, {
+    id: '600000000000000002',
+    isChatInputCommand: () => false,
+    isButton: () => true,
+    customId: 'citycraft_whitelist_request',
+  });
+  router.handle(button.interaction);
+  await Promise.all(router.pending);
+  assert.match(customId, /^citycraft:/);
+  assert.equal(button.replies.length, 0);
+  const submit = mockInteraction('citycraft');
+  submit.raw.user = button.raw.user;
+  Object.assign(submit.raw, {
+    id: '600000000000000003',
+    isChatInputCommand: () => false,
+    isModalSubmit: () => true,
+    customId,
+    fields: { getTextInputValue: () => 'OtherPlayer', getStringSelectValues: () => ['java'] },
+  });
+  router.handle(submit.interaction);
+  await Promise.all(router.pending);
+  assert.equal(submit.raw.ephemeral, true);
+  assertEmbeds(submit.replies);
+  assertEmbeds(sent);
+  assert.match(submit.replies[0]!.embeds[0]!.data.description!, /request for.*OtherPlayer/);
+  assert.match(sent[0]!.embeds[0]!.data.description!, /400000000000000002/);
+  assert.equal(command.replies.length, 1);
+  assert.doesNotMatch(command.replies[0]!.embeds[0]!.data.description!, /OtherPlayer/);
 });
 
 test('router denies commands from other servers with an embedded error', async () => {

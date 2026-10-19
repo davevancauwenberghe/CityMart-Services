@@ -17,7 +17,7 @@ A Discord bot for the CityMart community. Built with TypeScript, Node.js 24 or 2
 | `/activity username`                             | easyPOS playtime, messages and positions.                              |
 | `/ask prompt [private] [reset]`                  | hallAI question and answer in one embed; long answers continue safely. |
 | `/forget [private]`                              | Delete your public or private Hall context in this channel.            |
-| `/citycraft`                                     | Server status, player count, ping and a whitelist-request button.      |
+| `/citycraft`                                     | Public status, player count, ping and a whitelist-request button.      |
 | `/giveaway list`, `/giveaway entries message_id` | Find giveaways and browse participants.                                |
 | `/giveaway start prize [duration] [end]`         | Owner: start a giveaway in the current channel.                        |
 | `/giveaway end message_id`                       | Owner: draw early or retry an interrupted result delivery.             |
@@ -36,6 +36,8 @@ Administrative actions are restricted to the configured Discord server's owner. 
 2. Allow outbound TCP from the bot to `157.173.101.60:25565` for the CityCraft status check. The defaults already match this server. Set `CITYCRAFT_STATUS_HOST` and `CITYCRAFT_STATUS_PORT` only if the target changes; keep `CITYCRAFT_ADDRESS` as the address shown to players and sent in the Minecraft handshake.
 3. Startup bulk-replaces the guild command registry. Confirm `/citycraft` shows information and the **Request whitelist access** button. `/citycraft info` and `/citycraft request` are removed, along with `/donations`, `/donationsleaderboard`, `/minecraft player` and `/ranking`.
 4. Grant **Attach Files** where Hall is used, then check `/ask`, a follow-up, `/forget`, and `private:true`. Existing `EASYPOS_DONATIONS_TOKEN`, `EASYPOS_RANKING_TOKEN` and `EASYPOS_RANKING_MOD_ID` variables are unused and can be removed from Coolify.
+
+`/citycraft` posts its information and status publicly in the channel. Any member can use its **Request whitelist access** button; the form belongs to the member who clicked it. Submitted usernames are sent privately to the configured owner, and submission confirmations and errors are private.
 
 CityCraft performs a read-only Java Server List Ping, with a four-second deadline and a shared 20-second cache. It reports online only after a valid Minecraft response; latency is shown only after a matching pong. A refused connection or timeout is labelled **Offline or unreachable**, since network access cannot prove the server is offline. Player names and the server MOTD are not displayed or stored. Whitelist requests remain available during a status failure. No RCON password, inbound port or extra dependency is needed.
 
@@ -140,7 +142,7 @@ See [REVIEW.md](REVIEW.md) for findings and remaining operational limits, [CHANG
 
 Deploy Hall v2 first and set its `OPENAI_API_KEY` and `DISCORD_API_KEY` secrets. Set `WORKER_URL` to its origin and `HALLAI_API_KEY` to the same integration secret in this bot’s runtime environment, then deploy this bot. Startup registers `/forget` alongside `/ask`. Never put this secret in the public site. Without it, other bot commands still work and Hall commands explain that setup is incomplete.
 
-The Worker owns moderation, GPT-6 Luna, request deduplication and expiring memory. The bot supplies verified Discord interaction identifiers and never sends its own system prompt or client-controlled history. There is no automatic retry of paid generation. Question text is escaped, mentions are disabled and question plus answer share one embed. Long replies continue in further embeds within Discord limits; private continuations stay private. Source links stay intact across embed boundaries. If a single source link is too long for an embed, the complete answer is attached as `hall-answer.md` with the same reply privacy. Allow **Attach Files** for this fallback. Web-search, fresh-context and safety labels appear when the Worker supplies them; truncated answers suggest a follow-up. Failures include a validated Worker reference ID when available.
+The Worker owns moderation, GPT-6 Luna, request deduplication and expiring memory. The bot supplies verified Discord interaction identifiers and never sends its own system prompt or client-controlled history. There is no automatic retry of paid generation. Question text is escaped, mentions are disabled and question plus answer share one embed. Long replies continue in further embeds within Discord limits; private continuations stay private. Source links stay intact across embed boundaries. If a single source link is too long for an embed, the complete answer is attached as `hall-answer.md` with the same reply privacy. Allow **Attach Files** for this fallback. Web-search, fresh-context and safety labels appear when the Worker supplies them, including **Safety checked** for `safety: "checked"`; truncated answers suggest a follow-up. Failures include a validated Worker reference ID when available.
 
 ### Fix an incomplete Hall Discord connection
 

@@ -82,7 +82,7 @@ export class Router {
         throw new UserError('This form has expired. Please open a new form from the command.');
       }
       const privateReply =
-        ['help', 'about', 'ping', 'support', 'citycraft', 'user', 'giveaway', 'forget'].includes(
+        ['help', 'about', 'ping', 'support', 'user', 'giveaway', 'forget'].includes(
           interaction.commandName,
         ) ||
         (interaction.commandName === 'ask' && interaction.options.getBoolean('private') === true);

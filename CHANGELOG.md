@@ -2,6 +2,8 @@
 
 ## 1.4.1
 
+- Fix follow-up review findings: keep balanced, nested and escaped URL parentheses inside complete citations, and display **Safety checked** when the Worker returns `safety: "checked"`.
+- Make the `/citycraft` information/status response public. Each member can open their own whitelist form from the shared button; submission confirmations remain private.
 - Refine Hall replies for the updated Worker: keep complete web-search citations together, label search and fresh-context responses, surface safe failure reference IDs and explain when a follow-up can continue a truncated answer.
 - Preserve the combined question/answer embed, public/private conversation separation, Worker-owned moderation and memory, and private continuations. Attach the complete answer when an individual source link exceeds the embed budget.
 - Replace `/citycraft info` and `/citycraft request` with `/citycraft`: one information/status response with the existing whitelist-request button and form.
