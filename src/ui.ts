@@ -92,21 +92,45 @@ export async function respondError(interaction: ReplyInteraction, error: unknown
     ),
   ]);
 }
-/** Keep fenced code readable across Discord's per-embed description limit. */
-export function splitAnswer(value: string, max = 3500): string[] {
-  if (!Number.isInteger(max) || max < 128 || max > 4096)
+/** Preserve complete source links, Unicode and code fences across embed boundaries. */
+export function splitAnswer(value: string, max = 3500, continuedMax = max): string[] {
+  if (
+    ![max, continuedMax].every((limit) => Number.isInteger(limit) && limit >= 128 && limit <= 4096)
+  )
     throw new RangeError('Invalid embed chunk size.');
+  // Hall's numbered citations use percent-encoded Markdown delimiters. Also
+  // protect ordinary links and auto-linked URLs; overlapping ranges are merged.
+  const spans = [
+    ...value.matchAll(/\[[^\]\n]{1,200}\]\(https?:\/\/[^\s)]*\)|https?:\/\/[^\s<>]+/g),
+  ].map((match) => ({ start: match.index, end: match.index + match[0].length }));
+  const protectedSpans: { start: number; end: number }[] = [];
+  for (const span of spans) {
+    const previous = protectedSpans.at(-1);
+    if (previous && span.start <= previous.end) previous.end = Math.max(previous.end, span.end);
+    else protectedSpans.push(span);
+  }
   const chunks: string[] = [];
   let remaining = value;
   let fence = '';
+  let offset = 0;
   while (remaining.length) {
     const prefix = fence ? `\`\`\`${fence}\n` : '';
-    const limit = max - prefix.length - 6;
+    const limit = (chunks.length ? continuedMax : max) - prefix.length - 6;
     let end = Math.min(limit, remaining.length);
     if (end < remaining.length) {
       const newline = remaining.lastIndexOf('\n', end);
       if (newline > limit / 2) end = newline + 1;
       if (/^[\uDC00-\uDFFF]$/.test(remaining[end] || '')) end--;
+    }
+    const crossing = protectedSpans.find(
+      (span) => span.start < offset + end && span.end > offset + end,
+    );
+    if (crossing) {
+      if (crossing.start > offset) end = crossing.start - offset;
+      else if (!chunks.length && continuedMax > max) {
+        chunks.push('The answer continues below.');
+        continue;
+      } else throw new RangeError('A source link is too long for an embed.');
     }
     const part = remaining.slice(0, end);
     for (const match of part.matchAll(/^```([^\n`]*)/gm)) {
@@ -115,6 +139,7 @@ export function splitAnswer(value: string, max = 3500): string[] {
     }
     chunks.push(prefix + part + (fence ? '\n```' : ''));
     remaining = remaining.slice(end);
+    offset += end;
   }
   return chunks.length ? chunks : ['No response was returned.'];
 }

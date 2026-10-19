@@ -8,7 +8,6 @@ import { registerCommands } from './commands.js';
 import { HttpClient } from './services/http.js';
 import { Roblox } from './services/roblox.js';
 import { Easypos } from './services/easypos.js';
-import { Minecraft } from './services/minecraft.js';
 import { Hallai } from './services/hallai.js';
 import { GiveawayStore } from './giveaways/store.js';
 import { Giveaways } from './giveaways/service.js';
@@ -39,7 +38,6 @@ const giveaways = new Giveaways(store, client, config);
 const router = new Router(config, client, {
   roblox,
   easypos: new Easypos(http, config),
-  minecraft: new Minecraft(http),
   hallai,
   giveaways,
   citycraft: new Citycraft(client, config),

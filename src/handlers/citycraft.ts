@@ -16,7 +16,7 @@ import {
 import type { Config } from '../config.js';
 import { RateLimit, UserError } from '../core.js';
 import { embed, message, respond, literal } from '../ui.js';
-import { isMinecraftUsername } from '../services/minecraft.js';
+import { CitycraftStatus } from '../services/citycraft-status.js';
 
 export class Citycraft {
   private modals = new Map<string, { actor: string; guild: string; expires: number }>();
@@ -24,17 +24,53 @@ export class Citycraft {
   constructor(
     private readonly client: Client,
     private readonly config: Config,
+    private readonly status = new CitycraftStatus({
+      host: config.citycraftStatusHost,
+      port: config.citycraftStatusPort,
+      address: config.citycraftAddress,
+    }),
   ) {}
   async info(interaction: ChatInputCommandInteraction) {
+    const status = await this.status.check();
+    const result = embed(
+      'Welcome to CityCraft',
+      `CityMart’s Minecraft community.\n\n**Server address:** ${literal(this.config.citycraftAddress)}\n\nRequest whitelist access below. Your Minecraft username and Discord account will be sent privately to the server owner.`,
+      'minecraft',
+    ).addFields(
+      {
+        name: 'Server status',
+        value:
+          status.state === 'online'
+            ? 'Online'
+            : status.state === 'unreachable'
+              ? 'Offline or unreachable'
+              : 'Status unavailable',
+        inline: true,
+      },
+      {
+        name: 'Players',
+        value: status.players ? `${status.players.online} / ${status.players.max}` : '—',
+        inline: true,
+      },
+      {
+        name: 'Ping',
+        value: status.latencyMs === undefined ? '—' : `${status.latencyMs} ms`,
+        inline: true,
+      },
+    );
+    if (status.version)
+      result.addFields({
+        name: 'Server version',
+        value: literal(status.version, 150),
+        inline: true,
+      });
+    result.addFields({
+      name: 'Last checked',
+      value: `<t:${Math.floor(status.checkedAt / 1000)}:R> · cached for up to 20 seconds`,
+    });
     return respond(
       interaction,
-      [
-        embed(
-          'Welcome to CityCraft',
-          `CityMart’s Minecraft community.\n\n**Server address:** ${literal(this.config.citycraftAddress)}\n\nRequest whitelist access below. Your Minecraft username and Discord account will be sent privately to the server owner.`,
-          'minecraft',
-        ),
-      ],
+      [result],
       [
         new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
@@ -93,21 +129,23 @@ export class Citycraft {
       modal.guild !== interaction.guildId ||
       modal.expires <= Date.now()
     )
-      throw new UserError('This request form expired. Use /citycraft request to open a new one.');
+      throw new UserError(
+        'This request form expired. Open /citycraft and use Request whitelist access to try again.',
+      );
     this.modals.delete(interaction.customId);
     const username = interaction.fields.getTextInputValue('username').trim();
     const edition = interaction.fields.getStringSelectValues('edition')[0];
     if (edition !== 'java' && edition !== 'bedrock')
       throw new UserError(
-        'Enter Java or Bedrock for the edition. Open /citycraft request to try again.',
+        'Choose Java or Bedrock for the edition. Open /citycraft and use Request whitelist access to try again.',
       );
     if (
       edition === 'java'
-        ? !isMinecraftUsername(username)
+        ? !/^[A-Za-z0-9_]{3,16}$/.test(username)
         : !/^[A-Za-z0-9][A-Za-z0-9 _]{2,15}$/.test(username)
     )
       throw new UserError(
-        'That Minecraft username is not valid for the selected edition. Open /citycraft request to try again.',
+        'That Minecraft username is not valid for the selected edition. Open /citycraft and use Request whitelist access to try again.',
       );
     this.limit.take(interaction.user.id);
     const owner = await this.client.users.fetch(this.config.citycraftOwnerId);

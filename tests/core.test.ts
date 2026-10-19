@@ -16,7 +16,8 @@ test('validates startup settings while keeping deployed variable names', () => {
   assert.throws(() => readConfig({ ...env, WORKER_URL: 'http://example.com' }));
   assert.throws(() => readConfig({ ...env, WORKER_URL: 'https://user:pass@example.com' }));
   assert.throws(() => readConfig({ ...env, TIME_ZONE: 'Moon/CityMart' }));
-  assert.throws(() => readConfig({ ...env, EASYPOS_RANKING_MOD_ID: 'NaN' }));
+  assert.throws(() => readConfig({ ...env, CITYCRAFT_STATUS_PORT: '0' }));
+  assert.throws(() => readConfig({ ...env, CITYCRAFT_STATUS_HOST: 'http://example.com/' }));
 });
 
 test('negative results are cached and concurrent requests are coalesced', async () => {
@@ -83,8 +84,10 @@ test('giveaway dates reject rollovers, past dates and ambiguous or skipped DST t
 test('command registry removes keywords, exposes required upgrades and validates schemas', () => {
   const names = commands.map((command) => command.name);
   assert.equal(new Set(names).size, names.length);
-  assert.equal(names.includes('keywords'), false);
-  for (const name of ['help', 'ask', 'user', 'giveaway', 'ranking', 'minecraft'])
+  for (const name of ['keywords', 'donations', 'donationsleaderboard', 'minecraft', 'ranking'])
+    assert.equal(names.includes(name), false);
+  assert.ok(!commands.find((command) => command.name === 'citycraft')!.options?.length);
+  for (const name of ['help', 'ask', 'user', 'giveaway', 'citycraft'])
     assert.ok(names.includes(name));
   const ask = commands.find((command) => command.name === 'ask')!;
   assert.ok(ask.options?.some((option) => option.name === 'reset'));

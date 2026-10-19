@@ -32,24 +32,7 @@ export const commands = [
   base('documentation', 'Read the CityMart documentation'),
   base('lorebook', 'Read the CityMart Lore Book'),
   base('lamp', 'Investigate a suspiciously ordinary lamp'),
-  base('citycraft', 'CityCraft server information and whitelist requests')
-    .addSubcommand((sub) => sub.setName('info').setDescription('View CityCraft server details'))
-    .addSubcommand((sub) =>
-      sub.setName('request').setDescription('Request CityCraft whitelist access'),
-    ),
-  base('minecraft', 'Look up a Minecraft Java player').addSubcommand((sub) =>
-    sub
-      .setName('player')
-      .setDescription('View a Java player’s skin, cape and profile')
-      .addStringOption((option) =>
-        option
-          .setName('username')
-          .setDescription('Java Edition username; UUID lookup is not available')
-          .setRequired(true)
-          .setMinLength(3)
-          .setMaxLength(16),
-      ),
-  ),
+  base('citycraft', 'View CityCraft server status and request whitelist access'),
   base('ask', 'Ask hallAI a question')
     .addStringOption((option) =>
       option
@@ -73,8 +56,6 @@ export const commands = [
   ),
   username(base('memberlookup', 'View a Roblox profile and CityMart community role')),
   username(base('activity', 'View a Roblox player’s CityMart activity')),
-  username(base('donations', 'View a Roblox player’s CityMart donations')),
-  base('donationsleaderboard', 'View CityMart’s top ten donors'),
   base('communitycount', 'View the current CityMart community member count'),
   base('user', 'View a Discord member’s profile and server details').addUserOption((option) =>
     option.setName('member').setDescription('Member to look up (default: you)'),
@@ -131,22 +112,11 @@ export const commands = [
         option.setName('user').setDescription('Entrant to remove').setRequired(true),
       ),
     ),
-  base('ranking', 'Change a Roblox user’s CityMart rank (server owner only)')
-    .addSubcommand((sub) =>
-      username(sub.setName('promote').setDescription('Promote a Roblox user')).addStringOption(
-        (option) =>
-          option
-            .setName('scale_code')
-            .setDescription('Optional easyPOS ranking scale code')
-            .setMaxLength(100),
-      ),
-    )
-    .addSubcommand((sub) => username(sub.setName('demote').setDescription('Demote a Roblox user'))),
 ].map((command) => command.toJSON());
 
 export async function registerCommands(config: Config, applicationId: string) {
   const rest = new REST({ version: '10', timeout: 15_000 }).setToken(config.token);
-  // Guild-scoped bulk replacement removes the retired /keywords command.
+  // Guild-scoped replacement also removes deprecated commands/subcommands.
   return rest.put(Routes.applicationGuildCommands(applicationId, config.guildId), {
     body: commands,
   });

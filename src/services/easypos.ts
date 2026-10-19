@@ -37,45 +37,4 @@ export class Easypos {
       },
     };
   }
-  async donations(userId: number) {
-    const data = await this.call('donations/lookup', this.config.donationsToken, { userId });
-    const amount = numberValue(data.amount);
-    if (amount === null) throw new ServiceError('easyPOS');
-    return amount;
-  }
-  async leaderboard() {
-    const data = await this.call('donations/leaderboard', this.config.donationsToken);
-    if (!Array.isArray(data.donations)) throw new ServiceError('easyPOS');
-    return data.donations.slice(0, 10).map((value) => {
-      const entry = object(value),
-        userId = Number(entry.userId),
-        amount = numberValue(entry.amount);
-      if (!Number.isSafeInteger(userId) || userId <= 0 || amount === null)
-        throw new ServiceError('easyPOS');
-      return { userId, amount };
-    });
-  }
-  async rank(action: 'promote' | 'demote', userId: number, scaleCode: string | null) {
-    if (!this.config.rankingModId)
-      throw new UserError('Ranking has not been enabled by the server owner yet.');
-    // Mutations are sent once. A timeout can mean the upstream service applied the change.
-    let data: Record<string, unknown>;
-    try {
-      data = await this.call(`ranking/${action}`, this.config.rankingToken, {
-        userId,
-        modId: Number(this.config.rankingModId),
-        ...(action === 'promote' && scaleCode ? { scaleCode } : {}),
-      });
-    } catch (error) {
-      if (error instanceof UserError) throw error;
-      throw new UserError(
-        'The ranking service did not confirm the result. Check the user’s current Roblox rank before trying again; the change may already have been applied.',
-      );
-    }
-    if (typeof data.rank !== 'string' && typeof data.rank !== 'number')
-      throw new UserError(
-        'The ranking service returned an unexpected result. Check the user’s current rank before trying again.',
-      );
-    return String(data.rank);
-  }
 }

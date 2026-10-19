@@ -1,37 +1,43 @@
-# CityMart Services 1.4.0
+# CityMart Services 1.4.1
 
-A Discord bot for the CityMart community. Built with TypeScript, Node.js 24 LTS and discord.js 14. All Discord messages use consistent embeds. Ordinary messages do not trigger commands or reactions, and the bot does not read message content.
+A Discord bot for the CityMart community. Built with TypeScript, Node.js 24 or 26 and discord.js 14. All Discord messages use consistent embeds. Ordinary messages do not trigger commands or reactions, and the bot does not read message content.
 
 ## Commands
 
-| Command                                                              | Purpose                                                                |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `/help`                                                              | Browse an interactive command guide.                                   |
-| `/about`, `/ping`                                                    | Version, uptime and responsiveness.                                    |
-| `/support`                                                           | Find the support team.                                                 |
-| `/community`, `/experience`, `/application`                          | CityMart Roblox links.                                                 |
-| `/documentation`, `/lorebook`, `/lamp`                               | Guides, stories and a lamp.                                            |
-| `/user [member]`                                                     | Discord account, join date, roles and avatar.                          |
-| `/memberlookup username`                                             | Roblox profile and CityMart community role.                            |
-| `/communitycount`                                                    | Current Roblox community size.                                         |
-| `/activity username`                                                 | easyPOS playtime, messages and positions.                              |
-| `/donations username`, `/donationsleaderboard`                       | Donation totals and top ten donors.                                    |
-| `/minecraft player username`                                         | Minecraft Java profile, skin and cape; no UUID input or output.        |
-| `/ask prompt [private] [reset]`                                      | hallAI question and answer in one embed; long answers continue safely. |
-| `/forget [private]`                                                  | Delete your public or private Hall context in this channel.            |
-| `/citycraft info`, `/citycraft request`                              | Server details and a private whitelist request form.                   |
-| `/giveaway list`, `/giveaway entries message_id`                     | Find giveaways and browse participants.                                |
-| `/giveaway start prize [duration] [end]`                             | Owner: start a giveaway in the current channel.                        |
-| `/giveaway end message_id`                                           | Owner: draw early or retry an interrupted result delivery.             |
-| `/giveaway reroll message_id`                                        | Owner: choose a new winner, excluding previous winners.                |
-| `/giveaway removeentrant message_id user`                            | Owner: remove an entrant before the draw.                              |
-| `/ranking promote username [scale_code]`, `/ranking demote username` | Owner: change a Roblox user's CityMart rank.                           |
+| Command                                          | Purpose                                                                |
+| ------------------------------------------------ | ---------------------------------------------------------------------- |
+| `/help`                                          | Browse an interactive command guide.                                   |
+| `/about`, `/ping`                                | Version, uptime and responsiveness.                                    |
+| `/support`                                       | Find the support team.                                                 |
+| `/community`, `/experience`, `/application`      | CityMart Roblox links.                                                 |
+| `/documentation`, `/lorebook`, `/lamp`           | Guides, stories and a lamp.                                            |
+| `/user [member]`                                 | Discord account, join date, roles and avatar.                          |
+| `/memberlookup username`                         | Roblox profile and CityMart community role.                            |
+| `/communitycount`                                | Current Roblox community size.                                         |
+| `/activity username`                             | easyPOS playtime, messages and positions.                              |
+| `/ask prompt [private] [reset]`                  | hallAI question and answer in one embed; long answers continue safely. |
+| `/forget [private]`                              | Delete your public or private Hall context in this channel.            |
+| `/citycraft`                                     | Server status, player count, ping and a whitelist-request button.      |
+| `/giveaway list`, `/giveaway entries message_id` | Find giveaways and browse participants.                                |
+| `/giveaway start prize [duration] [end]`         | Owner: start a giveaway in the current channel.                        |
+| `/giveaway end message_id`                       | Owner: draw early or retry an interrupted result delivery.             |
+| `/giveaway reroll message_id`                    | Owner: choose a new winner, excluding previous winners.                |
+| `/giveaway removeentrant message_id user`        | Owner: remove an entrant before the draw.                              |
 
 Use exactly one giveaway timing option: `duration:2h`, `duration:7d`, or `end:2026-12-20 18:00`. Dates use `TIME_ZONE` (Europe/Brussels by default); ambiguous or skipped daylight-saving times are rejected. Durations run for the requested elapsed time. Giveaways may last between one minute and 90 days. Existing giveaway buttons remain compatible.
 
-Administrative actions are restricted to the configured Discord server's owner. Use Discord **Server Settings → Integrations → CityMart Services** to restrict command availability further; this does not grant non-owners ranking or giveaway management rights. Participation requires the configured minimum role or a higher role; a missing configured role blocks entries rather than allowing everyone. Eligibility is checked when joining. Rerolls use the saved entrants, so the owner should remove ineligible entrants before ending a giveaway.
+Administrative actions are restricted to the configured Discord server's owner. Use Discord **Server Settings → Integrations → CityMart Services** to restrict command availability further; this does not grant non-owners giveaway management rights. Participation requires the configured minimum role or a higher role; a missing configured role blocks entries rather than allowing everyone. Eligibility is checked when joining. Rerolls use the saved entrants, so the owner should remove ineligible entrants before ending a giveaway.
 
 `/ask` defaults to a public answer. Set `private:true` to keep both the answer and its continuations visible only to you. The authenticated Hall v2 Worker keeps up to 12 exchanges and expires them after 24 hours of inactivity, including across bot restarts. Context is separated by your account, server, channel and public/private reply mode. `reset:true` deletes that context before asking. `/forget` deletes your public Hall context in this channel; `/forget private:true` deletes private context. Both confirmations are private. This does not delete Discord posts or provider security logs. Do not send secrets to the AI. The bot does not keep a second transcript in its own memory.
+
+## Upgrade from 1.4.0 to 1.4.1
+
+1. Deploy this release using your existing Hall connection and `/data` volume. No new secret or data migration is required for this update; the Hall secrets required since 1.4.0 remain required.
+2. Allow outbound TCP from the bot to `157.173.101.60:25565` for the CityCraft status check. The defaults already match this server. Set `CITYCRAFT_STATUS_HOST` and `CITYCRAFT_STATUS_PORT` only if the target changes; keep `CITYCRAFT_ADDRESS` as the address shown to players and sent in the Minecraft handshake.
+3. Startup bulk-replaces the guild command registry. Confirm `/citycraft` shows information and the **Request whitelist access** button. `/citycraft info` and `/citycraft request` are removed, along with `/donations`, `/donationsleaderboard`, `/minecraft player` and `/ranking`.
+4. Grant **Attach Files** where Hall is used, then check `/ask`, a follow-up, `/forget`, and `private:true`. Existing `EASYPOS_DONATIONS_TOKEN`, `EASYPOS_RANKING_TOKEN` and `EASYPOS_RANKING_MOD_ID` variables are unused and can be removed from Coolify.
+
+CityCraft performs a read-only Java Server List Ping, with a four-second deadline and a shared 20-second cache. It reports online only after a valid Minecraft response; latency is shown only after a matching pong. A refused connection or timeout is labelled **Offline or unreachable**, since network access cannot prove the server is offline. Player names and the server MOTD are not displayed or stored. Whitelist requests remain available during a status failure. No RCON password, inbound port or extra dependency is needed.
 
 ## Upgrade the existing Coolify application
 
@@ -39,9 +45,9 @@ Administrative actions are restricted to the configured Discord server's owner. 
 2. Deploy the companion Hall v2 Worker first, with its `OPENAI_API_KEY` and `DISCORD_API_KEY` secrets configured.
 3. Before deploying this bot, set `WORKER_URL` to the Worker's HTTPS origin (for example, `https://hall.davevancauwenberghe.be`) and `HALLAI_API_KEY` to exactly the same secret as the Worker's `DISCORD_API_KEY`. Add them to Coolify's **production runtime Environment Variables**, with build-time availability disabled, and mark `HALLAI_API_KEY` as a secret. **Both variables are required for `/ask` and `/forget`.** Keep your other runtime variables; `CLIENT_ID` is checked when set, or derived from the logged-in bot when absent.
 4. Merge the reviewed PR and deploy `main` using the **Dockerfile** build pack. Keep only one production instance, with **Consistent name (no rolling updates)** enabled. Avoid running the Fly copy or PR previews with the production bot token. Do not override the new Docker start command with `node index.js`.
-5. Ensure the Discord installation includes `bot` and `applications.commands`. The bot registers the current guild command list automatically at startup, replacing `/keywords` with `/help`.
+5. Ensure the Discord installation includes `bot` and `applications.commands`. The bot registers the current guild command list automatically at startup, removing deprecated commands and replacing the CityCraft subcommands with `/citycraft`.
 6. **Message Content Intent, Server Members Intent and Presence Intent are unnecessary and can be disabled** in the Developer Portal. The bot uses only the Guilds gateway intent and fetches individual members when needed.
-7. Read Runtime Logs for `CityMart Services v1.4.0 ready as ... Slash commands registered.` Then check `/help`, `/user`, `/ask`, `/forget`, and your enabled integrations. Create a small test giveaway, enter it, redeploy, and confirm the saved entry and eventual result.
+7. Read Runtime Logs for `CityMart Services v1.4.1 ready as ... Slash commands registered.` Then check `/help`, `/user`, `/ask`, `/forget`, and your enabled integrations. Create a small test giveaway, enter it, redeploy, and confirm the saved entry and eventual result.
 
 The Docker entrypoint repairs ownership of the bot's data directory and its two known data files, then runs Node as the container's unprivileged `node` user. No additional Linux account is needed on the VPS. It does not recursively change unrelated files. Custom volume layouts must allow UID 1000 to write `DATA_DIR`.
 
@@ -78,10 +84,9 @@ Set variables in Coolify's **production Environment Variables**, available **at 
 | `HALLAI_API_KEY`          | Secret matching the Hall Worker’s `DISCORD_API_KEY`; required for `/ask` and `/forget`. |
 | `WORKER_URL`              | HTTPS Hall v2 origin, e.g. `https://hall.davevancauwenberghe.be`.                       |
 | `EASYPOS_TOKEN`           | Activity API token.                                                                     |
-| `EASYPOS_DONATIONS_TOKEN` | Donation API token.                                                                     |
-| `EASYPOS_RANKING_TOKEN`   | Ranking API token.                                                                      |
-| `EASYPOS_RANKING_MOD_ID`  | Roblox moderator ID sent to easyPOS.                                                    |
 | `CITYCRAFT_OWNER_USER_ID` | Optional request recipient; defaults to the existing Dave account `651525636351066182`. |
+| `CITYCRAFT_STATUS_HOST`   | Status connection target; defaults to `157.173.101.60`.                                 |
+| `CITYCRAFT_STATUS_PORT`   | Status connection port; defaults to `25565`.                                            |
 | `CITYCRAFT_ADDRESS`       | Defaults to `citycraft.davevancauwenberghe.be`.                                         |
 | `TIME_ZONE`               | Giveaway date input zone; defaults to `Europe/Brussels`.                                |
 | `DATA_DIR`                | Writable persistent directory; defaults to `/data`.                                     |
@@ -104,11 +109,11 @@ Pending button activation and entrant-count refreshes are repaired every 30 seco
 - Docker probes `/ready` every 30 seconds, with a 90-second startup grace period.
 - SIGTERM/SIGINT stop intake, cancel outbound requests and drain active tasks. Unhandled failures exit with an error so the container can restart.
 
-Keep regular off-server backups of the volume. If startup reports invalid state, preserve the file and restore a known-good backup. For a pending giveaway result, restore channel permissions or configure access to the saved channel before retrying. For an uncertain ranking result, check Roblox before retrying: ranking mutations are deliberately never retried automatically. Logs include event names, safe error types/status codes and system/Discord error codes; tokens, AI questions, upstream bodies and arbitrary exception messages are omitted.
+Keep regular off-server backups of the volume. If startup reports invalid state, preserve the file and restore a known-good backup. For a pending giveaway result, restore channel permissions or configure access to the saved channel before retrying. Logs include event names, safe error types/status codes and system/Discord error codes; tokens, AI questions, upstream bodies and arbitrary exception messages are omitted.
 
 ## Development
 
-Use Node.js 24 (see `.nvmrc`).
+Use Node.js 24.15 or newer in the 24.x line (see `.nvmrc`), or Node.js 26. CI checks both major versions; Docker uses Node.js 26.
 
 ```bash
 npm ci
@@ -127,7 +132,7 @@ npm audit --omit=dev
 
 `npm start` runs the compiled application. `npm run commands` manually refreshes guild commands after building, if needed. Local `.env` loading uses Node's built-in loader. Production does not depend on TypeScript, tsx or dotenv.
 
-The tests use temporary storage, mocked Discord interactions, local HTTP servers and mocked integration responses. They never log into Discord or change real Roblox ranks. CI additionally builds the production image and tests volume permission repair, legacy migration, non-root execution and readiness. CodeQL scans TypeScript; Dependabot checks npm, Docker and Actions monthly.
+The tests use temporary storage, mocked Discord interactions, local HTTP/TCP servers and mocked integration responses. They never log into Discord, send real whitelist requests or contact the production Minecraft server. CI additionally builds the production image and tests volume permission repair, legacy migration, non-root execution and readiness. CodeQL scans TypeScript; Dependabot checks npm, Docker and Actions monthly.
 
 See [REVIEW.md](REVIEW.md) for findings and remaining operational limits, [CHANGELOG.md](CHANGELOG.md) for release changes and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance. Licensed under the [MIT License](LICENSE).
 
@@ -135,7 +140,7 @@ See [REVIEW.md](REVIEW.md) for findings and remaining operational limits, [CHANG
 
 Deploy Hall v2 first and set its `OPENAI_API_KEY` and `DISCORD_API_KEY` secrets. Set `WORKER_URL` to its origin and `HALLAI_API_KEY` to the same integration secret in this bot’s runtime environment, then deploy this bot. Startup registers `/forget` alongside `/ask`. Never put this secret in the public site. Without it, other bot commands still work and Hall commands explain that setup is incomplete.
 
-The Worker owns moderation, GPT-6 Luna, request deduplication and expiring memory. The bot supplies verified Discord interaction identifiers and never sends its own system prompt or client-controlled history. There is no automatic retry of paid generation. Question text is escaped, mentions are disabled and question plus answer share one embed. Oversized replies continue in further embeds within Discord limits; private continuations stay private.
+The Worker owns moderation, GPT-6 Luna, request deduplication and expiring memory. The bot supplies verified Discord interaction identifiers and never sends its own system prompt or client-controlled history. There is no automatic retry of paid generation. Question text is escaped, mentions are disabled and question plus answer share one embed. Long replies continue in further embeds within Discord limits; private continuations stay private. Source links stay intact across embed boundaries. If a single source link is too long for an embed, the complete answer is attached as `hall-answer.md` with the same reply privacy. Allow **Attach Files** for this fallback. Web-search, fresh-context and safety labels appear when the Worker supplies them; truncated answers suggest a follow-up. Failures include a validated Worker reference ID when available.
 
 ### Fix an incomplete Hall Discord connection
 
