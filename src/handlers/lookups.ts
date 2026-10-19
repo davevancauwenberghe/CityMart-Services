@@ -123,7 +123,9 @@ export async function ask(interaction: ChatInputCommandInteraction, hallai: Hall
       ? 'Safer direction'
       : answer.safety === 'support'
         ? 'Support'
-        : '',
+        : answer.safety === 'checked'
+          ? 'Safety checked'
+          : '',
   ].filter(Boolean);
   const footer = {
     text: `CityMart Services • hallAI • v${VERSION}${status.length ? ' • ' + status.join(' • ') : ''}`,

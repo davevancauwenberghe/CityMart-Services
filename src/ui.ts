@@ -98,16 +98,35 @@ export function splitAnswer(value: string, max = 3500, continuedMax = max): stri
     ![max, continuedMax].every((limit) => Number.isInteger(limit) && limit >= 128 && limit <= 4096)
   )
     throw new RangeError('Invalid embed chunk size.');
-  // Hall's numbered citations use percent-encoded Markdown delimiters. Also
-  // protect ordinary links and auto-linked URLs; overlapping ranges are merged.
-  const spans = [
-    ...value.matchAll(/\[[^\]\n]{1,200}\]\(https?:\/\/[^\s)]*\)|https?:\/\/[^\s<>]+/g),
-  ].map((match) => ({ start: match.index, end: match.index + match[0].length }));
+  // An inline citation can contain balanced or escaped URL parentheses. Scan
+  // through its outer delimiter before considering raw URLs outside the link.
+  const tokens = /\[(?:\\[^\r\n]|[^\]\\\r\n]){1,200}\]\(<?https?:\/\/|https?:\/\/[^\s<>]+/g;
   const protectedSpans: { start: number; end: number }[] = [];
-  for (const span of spans) {
-    const previous = protectedSpans.at(-1);
-    if (previous && span.start <= previous.end) previous.end = Math.max(previous.end, span.end);
-    else protectedSpans.push(span);
+  let token: RegExpExecArray | null;
+  while ((token = tokens.exec(value))) {
+    if (token[0].startsWith('[')) {
+      let depth = 1;
+      let end = tokens.lastIndex;
+      let angleDestination = /\]\(<https?:\/\/$/.test(token[0]);
+      for (; end < value.length; end++) {
+        const character = value[end]!;
+        // Angle-wrapped destinations allow spaces and tabs, but not line endings.
+        if (/[\r\n]/.test(character) || (!angleDestination && /\s/.test(character))) break;
+        if (character === '\\')
+          end++; // Escaped delimiters do not affect balance.
+        else if (angleDestination) {
+          if (character === '>') angleDestination = false;
+        } else if (character === '(') depth++;
+        else if (character === ')' && --depth === 0) break;
+      }
+      if (depth === 0) {
+        protectedSpans.push({ start: token.index, end: end + 1 });
+        tokens.lastIndex = end + 1;
+      } else {
+        // Incomplete Markdown still gets the ordinary URL protection below.
+        tokens.lastIndex = token.index + token[0].lastIndexOf('http');
+      }
+    } else protectedSpans.push({ start: token.index, end: tokens.lastIndex });
   }
   const chunks: string[] = [];
   let remaining = value;

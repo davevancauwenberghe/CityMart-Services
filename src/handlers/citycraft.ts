@@ -79,6 +79,7 @@ export class Citycraft {
             .setStyle(ButtonStyle.Success),
         ),
       ],
+      false,
     );
   }
   async show(interaction: ChatInputCommandInteraction | ButtonInteraction) {
