@@ -121,7 +121,7 @@ try {
   if (stopping) throw new Error('Startup cancelled.');
   if (config.clientId && config.clientId !== client.application!.id)
     throw new Error('CLIENT_ID does not match the logged-in bot.');
-  await client.guilds.fetch(config.guildId);
+  for (const guildId of config.guildIds) await client.guilds.fetch(guildId);
   await registerCommands(config, client.application!.id);
   initialized = true;
   console.log(

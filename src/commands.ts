@@ -117,7 +117,12 @@ export const commands = [
 export async function registerCommands(config: Config, applicationId: string) {
   const rest = new REST({ version: '10', timeout: 15_000 }).setToken(config.token);
   // Guild-scoped replacement also removes deprecated commands/subcommands.
-  return rest.put(Routes.applicationGuildCommands(applicationId, config.guildId), {
-    body: commands,
-  });
+  const results = [];
+  for (const guildId of config.guildIds)
+    results.push(
+      await rest.put(Routes.applicationGuildCommands(applicationId, guildId), {
+        body: commands,
+      }),
+    );
+  return results;
 }

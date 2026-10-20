@@ -4,6 +4,8 @@ The review covers the command registry, routing, Hall Worker contract, CityCraft
 
 ## Changes and safeguards
 
+- Optional labs support registers commands in the primary and configured labs servers. Other servers and DMs are rejected. Giveaway reads and mutations check the saved guild; the scheduler handles both configured guilds and skips removed ones. Channel and minimum-role settings remain separate. Hall and whitelist identities retain their guild boundary. Automated regression tests cover both servers, denied cross-server access, scheduled recovery after restart, local support links and role eligibility.
+
 - Deprecated command families and their integration code are removed. Guild registration replaces the full command list on startup.
 - CityCraft status is fetched only when requested. Concurrent checks share one connection, and positive and negative results are cached for 20 seconds. Status uses a four-second total deadline, validates packet framing and UTF-8 JSON, limits response bytes and verifies the ping nonce before reporting latency. Only counts and the version are retained in the cache; player names and MOTD are omitted.
 - Status checks cannot log in, run commands or modify the Minecraft server. The `/citycraft` information/status response is public. Its button opens a form for the member who clicks it and remains available when the server cannot be reached. Form submission replies are always private. Form nonces remain bound to their Discord user and guild, expire after ten minutes and are single-use. Requests are delivered only after the user submits the form.

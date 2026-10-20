@@ -245,3 +245,179 @@ test('scheduler repairs an active giveaway whose buttons could not be activated'
   await service.tick();
   assert.equal(edits, 1);
 });
+
+test('labs giveaways use local role eligibility and never accept production IDs from the other server', async (t) => {
+  const labGuildId = '100000000000000002',
+    labChannel = '200000000000000002',
+    labMessage = '300000000000000002';
+  const cfg = readConfig({
+    DISCORD_TOKEN: 'fake',
+    GUILD_ID: guildId,
+    LAB_GUILD_ID: labGuildId,
+    GIVEAWAY_MIN_ROLE_ID: other,
+  });
+  const store = await setup(t);
+  await store.add(fixture());
+  const roleRequests: string[] = [];
+  const channel = {
+    guildId: labGuildId,
+    isTextBased: () => true,
+    isDMBased: () => false,
+    isThread: () => false,
+    permissionsFor: () => ({ has: () => true }),
+    send: async () => ({
+      id: labMessage,
+      url: `https://discord.com/channels/${labGuildId}/${labChannel}/${labMessage}`,
+    }),
+    messages: { edit: async () => {} },
+  };
+  const bot = {
+    channels: { fetch: async () => channel },
+    guilds: {
+      fetch: async (server: string) => ({
+        members: { fetch: async () => ({ user: { bot: false } }) },
+        roles: {
+          fetch: async (role: string) => {
+            roleRequests.push(server + ':' + role);
+            return null;
+          },
+        },
+      }),
+    },
+  } as unknown as Client;
+  const service = new Giveaways(store, bot, cfg);
+  const url = await service.start(labChannel, labGuildId, owner, 'Lab prize', Date.now() + 60000);
+  assert.equal(url, `https://discord.com/channels/${labGuildId}/${labChannel}/${labMessage}`);
+  assert.equal(store.get(labMessage).guildId, labGuildId);
+  await service.join(labMessage, labGuildId, labChannel, entrant);
+  assert.deepEqual(store.get(labMessage).entrants, [entrant]);
+  assert.deepEqual(roleRequests, []);
+  await assert.rejects(service.join(messageId, guildId, channelId, entrant), /role was removed/);
+  assert.deepEqual(roleRequests, [guildId + ':' + other]);
+  const restricted = new Giveaways(store, bot, { ...cfg, labMinRoleId: owner });
+  await assert.rejects(
+    restricted.join(labMessage, labGuildId, labChannel, other),
+    /role was removed/,
+  );
+  assert.equal(roleRequests.at(-1), labGuildId + ':' + owner);
+  for (const [id, server] of [
+    [messageId, labGuildId],
+    [labMessage, guildId],
+  ]) {
+    assert.throws(() => service.scoped(id!, server!), /different server/);
+    await assert.rejects(service.finish(id!, server!), /different server/);
+    await assert.rejects(service.remove(id!, server!, entrant), /different server/);
+  }
+  let fetched = false;
+  const invalid = new Giveaways(
+    store,
+    {
+      channels: {
+        fetch: async () => {
+          fetched = true;
+        },
+      },
+    } as unknown as Client,
+    cfg,
+  );
+  await assert.rejects(
+    invalid.start(channelId, '900000000000000001', owner, 'Blocked', Date.now() + 60000),
+    /not configured/,
+  );
+  assert.equal(fetched, false);
+});
+
+test('the scheduler delivers both servers with local support links, ignores unconfigured records and resumes lab draws after restart', async (t) => {
+  const labGuildId = '100000000000000002';
+  const cfg = readConfig({
+    DISCORD_TOKEN: 'fake',
+    GUILD_ID: guildId,
+    LAB_GUILD_ID: labGuildId,
+    SUPPORT_CHANNEL_ID: '700000000000000001',
+    LAB_SUPPORT_CHANNEL_ID: '700000000000000002',
+  });
+  const store = await setup(t);
+  const records = [
+    fixture(),
+    {
+      ...fixture(),
+      guildId: labGuildId,
+      channelId: '200000000000000002',
+      messageId: '300000000000000002',
+      prize: 'Labs prize',
+    },
+    {
+      ...fixture(),
+      guildId: '900000000000000001',
+      channelId: '200000000000000003',
+      messageId: '300000000000000003',
+    },
+  ].map((value) => ({ ...value, entrants: [entrant], endAt: Date.now() - 1000 }));
+  for (const record of records) await store.add(record);
+  const announcements: string[] = [],
+    dms: unknown[] = [];
+  let failLab = true;
+  const bot = {
+    channels: {
+      fetch: async (id: string) => {
+        const record = records.find((value) => value.channelId === id)!;
+        assert.notEqual(record.guildId, '900000000000000001');
+        return {
+          guildId: record.guildId,
+          isTextBased: () => true,
+          isDMBased: () => false,
+          messages: {
+            edit: async () => {
+              if (record.guildId === labGuildId && failLab)
+                throw new Error('Temporary lab failure');
+            },
+          },
+          send: async () => {
+            announcements.push(record.guildId);
+            return { id: record.guildId === guildId ? '500000000000000001' : '500000000000000002' };
+          },
+        };
+      },
+    },
+    users: {
+      fetch: async () => ({
+        send: async (payload: unknown) => {
+          dms.push(payload);
+        },
+      }),
+    },
+  } as unknown as Client;
+  const service = new Giveaways(store, bot, cfg);
+  const original = console.error;
+  console.error = () => {};
+  try {
+    await service.tick();
+  } finally {
+    console.error = original;
+  }
+  assert.equal(store.get(messageId).delivered, true);
+  const labMessage = records[1]!.messageId;
+  const winner = store.get(labMessage).winnerId;
+  assert.equal(winner, entrant);
+  assert.equal(store.get(labMessage).delivered, false);
+  assert.equal(store.get(records[2]!.messageId).ended, false);
+  const restarted = new GiveawayStore(store.file);
+  await restarted.load();
+  failLab = false;
+  await new Giveaways(restarted, bot, cfg).tick();
+  assert.equal(restarted.get(labMessage).winnerId, winner);
+  assert.equal(restarted.get(labMessage).revision, 1);
+  assert.equal(restarted.get(labMessage).delivered, true);
+  assert.deepEqual(announcements, [guildId, labGuildId]);
+  assert.ok(
+    JSON.stringify(dms[0]).includes(
+      `https://discord.com/channels/${guildId}/${cfg.supportChannelId}`,
+    ),
+  );
+  assert.ok(
+    JSON.stringify(dms[1]).includes(
+      `https://discord.com/channels/${labGuildId}/${cfg.labSupportChannelId}`,
+    ),
+  );
+  assert.ok(!JSON.stringify(dms[1]).includes(cfg.supportChannelId));
+});

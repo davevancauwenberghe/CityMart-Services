@@ -5,6 +5,9 @@ import { readConfig } from '../src/config.js';
 import { Router } from '../src/router.js';
 import { ask, lookup } from '../src/handlers/lookups.js';
 import { info, help } from '../src/handlers/info.js';
+import { giveawayCommand, autocomplete } from '../src/handlers/giveaways.js';
+import type { Giveaways } from '../src/giveaways/service.js';
+import { Collection } from 'discord.js';
 import { Citycraft } from '../src/handlers/citycraft.js';
 import { UserError } from '../src/core.js';
 import { splitAnswer, literal } from '../src/ui.js';
@@ -517,7 +520,7 @@ test('router denies commands from other servers with an embedded error', async (
   router.handle(interaction);
   await Promise.all(router.pending);
   assertEmbeds(replies);
-  assert.match(replies[0]!.embeds[0]!.data.description!, /only in the CityMart server/);
+  assert.match(replies[0]!.embeds[0]!.data.description!, /only in configured CityMart servers/);
 });
 
 test('router acknowledges network commands before calling the integration and ignores replayed interactions', async () => {
@@ -675,4 +678,139 @@ test('/forget chooses the requested context scope and always confirms privately 
   }
   assert.ok(keys[0]!.endsWith(':public'));
   assert.ok(keys[1]!.endsWith(':private'));
+});
+
+test('configured labs support Hall commands with independent guild identities and private resets', async () => {
+  const labGuildId = '100000000000000002';
+  const cfg = readConfig({ DISCORD_TOKEN: 'fake', GUILD_ID: guildId, LAB_GUILD_ID: labGuildId });
+  const asks: string[] = [],
+    resets: string[] = [];
+  const hallai = {
+    ask: async (key: string) => {
+      asks.push(key);
+      return hallReply;
+    },
+    forget: async (key: string) => {
+      resets.push(key);
+    },
+  } as unknown as Hallai;
+  const router = new Router(cfg, client, { hallai } as unknown as ConstructorParameters<
+    typeof Router
+  >[2]);
+  let interactionId = 600000000000000000n;
+  for (const server of cfg.guildIds) {
+    for (const privateReply of [false, true]) {
+      for (const command of ['ask', 'forget']) {
+        const context = mockInteraction(command, { prompt: 'Question' }, { private: privateReply });
+        context.raw.id = String(++interactionId);
+        context.raw.guildId = server;
+        context.raw.guild.id = server;
+        router.handle(context.interaction);
+        await Promise.all(router.pending);
+        assertEmbeds(context.replies);
+        assert.equal(context.raw.ephemeral, command === 'forget' || privateReply);
+      }
+    }
+  }
+  assert.equal(new Set(asks).size, 4);
+  assert.deepEqual(resets, asks);
+  assert.ok(asks.some((key) => key.startsWith(labGuildId + ':')));
+  for (const server of ['900000000000000001', null]) {
+    const context = mockInteraction('ask', { prompt: 'Blocked' });
+    Object.assign(context.raw, { id: String(++interactionId), guildId: server });
+    router.handle(context.interaction);
+    await Promise.all(router.pending);
+    assert.match(context.replies[0]!.embeds[0]!.data.description!, /only in configured/);
+  }
+  assert.equal(asks.length, 4);
+});
+
+test('support links and everyone-role filtering use the current server', async () => {
+  const cfg = readConfig({
+    DISCORD_TOKEN: 'fake',
+    GUILD_ID: guildId,
+    LAB_GUILD_ID: '100000000000000002',
+    SUPPORT_CHANNEL_ID: '700000000000000001',
+    LAB_SUPPORT_CHANNEL_ID: '700000000000000002',
+  });
+  for (const [server, channel] of [
+    [cfg.guildId, cfg.supportChannelId],
+    [cfg.labGuildId, cfg.labSupportChannelId],
+  ]) {
+    const context = mockInteraction('support');
+    context.raw.guildId = server!;
+    await info(context.interaction, cfg, client, roblox);
+    const payload = JSON.stringify(context.replies);
+    assert.ok(payload.includes(`https://discord.com/channels/${server}/${channel}`));
+    const withoutLabSupport = { ...cfg, labSupportChannelId: '' };
+    if (server === cfg.labGuildId) {
+      const fallback = mockInteraction('support');
+      fallback.raw.guildId = server;
+      await info(fallback.interaction, withoutLabSupport, client, roblox);
+      assert.doesNotMatch(JSON.stringify(fallback.replies), new RegExp(cfg.supportChannelId));
+    }
+  }
+  const context = mockInteraction('user');
+  context.raw.guildId = cfg.labGuildId;
+  Object.assign(context.raw.guild, {
+    id: cfg.labGuildId,
+    members: {
+      fetch: async () => ({
+        roles: {
+          cache: new Collection([
+            [cfg.labGuildId, { id: cfg.labGuildId, position: 0 }],
+            ['800000000000000001', { id: '800000000000000001', position: 1 }],
+          ]),
+        },
+        joinedTimestamp: Date.now(),
+      }),
+    },
+  });
+  await info(context.interaction, cfg, client, roblox);
+  const roles = context.replies[0]!.embeds[0]!.data.fields!.find((field) =>
+    field.name.startsWith('Roles'),
+  )!;
+  assert.equal(roles.value, '<@&800000000000000001>');
+});
+
+test('giveaway lists and autocomplete never expose another configured server', async () => {
+  const cfg = readConfig({
+    DISCORD_TOKEN: 'fake',
+    GUILD_ID: guildId,
+    LAB_GUILD_ID: '100000000000000002',
+  });
+  const records = cfg.guildIds.map((server, index) => ({
+    guildId: server,
+    channelId: '200000000000000001',
+    messageId: String(300000000000000001n + BigInt(index)),
+    prize: index ? 'LABSONLY' : 'PRODUCTIONONLY',
+    ended: false,
+    delivered: false,
+    endAt: Date.now() + 10000,
+  }));
+  const service = { store: { list: () => records } } as unknown as Giveaways;
+  for (const server of cfg.guildIds) {
+    const context = mockInteraction('giveaway', { sub: 'list' });
+    context.raw.guildId = server;
+    await giveawayCommand(context.interaction, service, cfg);
+    const own = server === cfg.guildId ? 'PRODUCTIONONLY' : 'LABSONLY',
+      other = server === cfg.guildId ? 'LABSONLY' : 'PRODUCTIONONLY';
+    assert.ok(context.replies[0]!.embeds[0]!.data.description!.includes(own));
+    assert.ok(!context.replies[0]!.embeds[0]!.data.description!.includes(other));
+    let choices: { value: string }[] = [];
+    await autocomplete(
+      {
+        guildId: server,
+        options: { getFocused: () => '', getSubcommand: () => 'end' },
+        respond: async (values: { value: string }[]) => {
+          choices = values;
+        },
+      } as unknown as Parameters<typeof autocomplete>[0],
+      service,
+    );
+    assert.deepEqual(
+      choices.map((value) => value.value),
+      records.filter((value) => value.guildId === server).map((value) => value.messageId),
+    );
+  }
 });

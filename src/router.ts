@@ -43,8 +43,8 @@ export class Router {
       return;
     try {
       if (this.stopping) throw new UserError('CityMart is restarting. Please try again shortly.');
-      if (interaction.guildId !== this.config.guildId)
-        throw new UserError('These commands are available only in the CityMart server.');
+      if (!interaction.guildId || !this.config.guildIds.includes(interaction.guildId))
+        throw new UserError('These commands are available only in configured CityMart servers.');
       for (const [id, time] of this.recent)
         if (time < Date.now() - 15 * 60_000) this.recent.delete(id);
       if (this.recent.has(interaction.id)) return;

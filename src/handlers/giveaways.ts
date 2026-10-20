@@ -64,7 +64,7 @@ export async function giveawayCommand(
   if (sub === 'list') {
     const values = service.store
       .list()
-      .filter((value) => value.guildId === config.guildId)
+      .filter((value) => value.guildId === interaction.guildId)
       .sort((a, b) => Number(a.ended) - Number(b.ended) || b.endAt - a.endAt);
     const rows = values
       .slice(0, 10)

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add an optional `LAB_GUILD_ID` alongside the primary server, with command registration and interaction routing for both.
+- Scope giveaway lists, eligibility, scheduled draws and winner support links to their server. Add optional labs-only support channel and minimum-role settings.
+- Preserve separate Hall conversation identities across servers and filter the current server’s everyone role from `/user`.
+- Document activation through Coolify without changing existing secrets or the giveaway schema.
+
 ## 1.4.1
 
 - Fix follow-up review findings: keep balanced, nested and escaped URL parentheses inside complete citations, and display **Safety checked** when the Worker returns `safety: "checked"`.
