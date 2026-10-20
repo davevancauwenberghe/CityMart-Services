@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Cache, KeyedLock, RateLimit, ServiceError, safeLog } from '../src/core.js';
-import { readConfig } from '../src/config.js';
+import { readConfig, guildSettings } from '../src/config.js';
+import { REST, Routes } from 'discord.js';
 import { giveawayEnd } from '../src/giveaways/time.js';
-import { commands } from '../src/commands.js';
+import { commands, registerCommands } from '../src/commands.js';
 const env = { DISCORD_TOKEN: 'test-token', GUILD_ID: '100000000000000001' };
 
 test('validates startup settings while keeping deployed variable names', () => {
@@ -18,6 +19,75 @@ test('validates startup settings while keeping deployed variable names', () => {
   assert.throws(() => readConfig({ ...env, TIME_ZONE: 'Moon/CityMart' }));
   assert.throws(() => readConfig({ ...env, CITYCRAFT_STATUS_PORT: '0' }));
   assert.throws(() => readConfig({ ...env, CITYCRAFT_STATUS_HOST: 'http://example.com/' }));
+});
+
+test('labs are opt-in, validate IDs and keep per-server settings separate', () => {
+  const primary = readConfig(env);
+  assert.deepEqual(primary.guildIds, [env.GUILD_ID]);
+  assert.throws(() => guildSettings(primary, ''), /not configured/);
+  const config = readConfig({
+    ...env,
+    LAB_GUILD_ID: '100000000000000002',
+    SUPPORT_CHANNEL_ID: '200000000000000001',
+    GIVEAWAY_MIN_ROLE_ID: '300000000000000001',
+    LAB_SUPPORT_CHANNEL_ID: '200000000000000002',
+    LAB_GIVEAWAY_MIN_ROLE_ID: '300000000000000002',
+  });
+  assert.deepEqual(config.guildIds, [env.GUILD_ID, '100000000000000002']);
+  assert.deepEqual(guildSettings(config, config.guildId), {
+    supportChannelId: '200000000000000001',
+    minRoleId: '300000000000000001',
+  });
+  assert.deepEqual(guildSettings(config, config.labGuildId), {
+    supportChannelId: '200000000000000002',
+    minRoleId: '300000000000000002',
+  });
+  const defaults = readConfig({
+    ...env,
+    LAB_GUILD_ID: config.labGuildId,
+    SUPPORT_CHANNEL_ID: config.supportChannelId,
+    GIVEAWAY_MIN_ROLE_ID: config.minRoleId,
+  });
+  assert.deepEqual(guildSettings(defaults, defaults.labGuildId), {
+    supportChannelId: '',
+    minRoleId: '',
+  });
+  assert.throws(() => guildSettings(config, '900000000000000001'), /not configured/);
+  for (const bad of [
+    { LAB_GUILD_ID: 'oops' },
+    { LAB_GUILD_ID: env.GUILD_ID },
+    { LAB_SUPPORT_CHANNEL_ID: 'oops' },
+    { LAB_GIVEAWAY_MIN_ROLE_ID: 'oops' },
+    { LAB_SUPPORT_CHANNEL_ID: '200000000000000002' },
+    { LAB_GIVEAWAY_MIN_ROLE_ID: '300000000000000002' },
+  ])
+    assert.throws(() => readConfig({ ...env, ...bad }));
+});
+
+test('startup/manual registration replaces commands in each configured server and propagates failures', async (t) => {
+  const calls: { route: string; body: unknown }[] = [];
+  let fail = false;
+  t.mock.method(REST.prototype, 'put', async (route: string, options?: { body?: unknown }) => {
+    if (fail && route.includes('100000000000000002')) throw new Error('Labs bot not installed');
+    calls.push({ route, body: options?.body });
+    return [];
+  });
+  const applicationId = '500000000000000001';
+  for (const labGuildId of ['', '100000000000000002']) {
+    calls.length = 0;
+    const config = readConfig({ ...env, LAB_GUILD_ID: labGuildId });
+    await registerCommands(config, applicationId);
+    assert.deepEqual(
+      calls.map((call) => call.route),
+      config.guildIds.map((id) => Routes.applicationGuildCommands(applicationId, id)),
+    );
+    assert.ok(calls.every((call) => call.body === commands));
+  }
+  fail = true;
+  await assert.rejects(
+    registerCommands(readConfig({ ...env, LAB_GUILD_ID: '100000000000000002' }), applicationId),
+    /not installed/,
+  );
 });
 
 test('negative results are cached and concurrent requests are coalesced', async () => {

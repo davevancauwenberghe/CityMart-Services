@@ -7,6 +7,7 @@ import {
   type GuildTextBasedChannel,
 } from 'discord.js';
 import type { Config } from '../config.js';
+import { guildSettings } from '../config.js';
 import { KeyedLock, UserError, safeLog, object } from '../core.js';
 import { embed, message, literal, links } from '../ui.js';
 import { GiveawayStore, type Giveaway } from './store.js';
@@ -49,13 +50,15 @@ export class Giveaways {
   ) {}
   scoped(id: string, guildId: string): Giveaway {
     const value = this.store.get(id);
-    if (value.guildId !== guildId || guildId !== this.config.guildId)
+    if (value.guildId !== guildId || !this.config.guildIds.includes(guildId))
       throw new UserError('This giveaway belongs to a different server.');
     return value;
   }
   private async channel(
     value: Pick<Giveaway, 'channelId' | 'guildId'>,
   ): Promise<GuildTextBasedChannel> {
+    if (!this.config.guildIds.includes(value.guildId))
+      throw new UserError('This server is not configured for giveaways.');
     const channel = await this.client.channels.fetch(value.channelId);
     if (
       !channel ||
@@ -122,8 +125,9 @@ export class Giveaways {
       const guild = await this.client.guilds.fetch(guildId);
       const member = await guild.members.fetch(actor);
       if (member.user.bot) throw new UserError('Bot accounts cannot enter giveaways.');
-      if (this.config.minRoleId) {
-        const role = await guild.roles.fetch(this.config.minRoleId);
+      const { minRoleId } = guildSettings(this.config, guildId);
+      if (minRoleId) {
+        const role = await guild.roles.fetch(minRoleId);
         if (!role)
           throw new UserError(
             'Giveaway eligibility is unavailable because the configured minimum role was removed. Please contact the server owner.',
@@ -209,6 +213,7 @@ export class Giveaways {
         record.dmAttempted = true;
       });
       if (value.winnerId) {
+        const { supportChannelId } = guildSettings(this.config, value.guildId);
         try {
           const winner = await this.client.users.fetch(value.winnerId);
           await winner.send(
@@ -220,11 +225,11 @@ export class Giveaways {
                   'giveaway',
                 ),
               ],
-              this.config.supportChannelId
+              supportChannelId
                 ? [
                     links([
                       'Contact support',
-                      `https://discord.com/channels/${value.guildId}/${this.config.supportChannelId}`,
+                      `https://discord.com/channels/${value.guildId}/${supportChannelId}`,
                     ]),
                   ]
                 : [],
@@ -241,7 +246,8 @@ export class Giveaways {
   }
   async tick(now = Date.now()) {
     for (const value of this.store.list()) {
-      if (value.guildId !== this.config.guildId || (value.ended && value.delivered)) continue;
+      if (!this.config.guildIds.includes(value.guildId) || (value.ended && value.delivered))
+        continue;
       try {
         if (!value.ended && value.endAt > now) {
           if (!value.messageUpdated)

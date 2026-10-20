@@ -45,10 +45,20 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
     throw new Error('Invalid CITYCRAFT_STATUS_PORT.');
   const guildId = id('GUILD_ID');
   if (!guildId) throw new Error('Missing GUILD_ID.');
+  const labGuildId = id('LAB_GUILD_ID');
+  if (labGuildId === guildId) throw new Error('LAB_GUILD_ID must differ from GUILD_ID.');
+  const labSupportChannelId = id('LAB_SUPPORT_CHANNEL_ID');
+  const labMinRoleId = id('LAB_GIVEAWAY_MIN_ROLE_ID');
+  if (!labGuildId && (labSupportChannelId || labMinRoleId))
+    throw new Error('LAB_GUILD_ID is required when lab channel or role settings are configured.');
   return {
     token: required('DISCORD_TOKEN'),
     clientId: id('CLIENT_ID'),
     guildId,
+    labGuildId,
+    guildIds: labGuildId ? [guildId, labGuildId] : [guildId],
+    labSupportChannelId,
+    labMinRoleId,
     port,
     timeZone,
     dataDir: resolve(env.DATA_DIR || '/data'),
@@ -70,3 +80,12 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env) {
   };
 }
 export type Config = ReturnType<typeof readConfig>;
+
+/** Channel/role IDs belong to one server; never reuse production IDs in labs. */
+export function guildSettings(config: Config, guildId: string) {
+  if (guildId === config.guildId)
+    return { supportChannelId: config.supportChannelId, minRoleId: config.minRoleId };
+  if (config.labGuildId && guildId === config.labGuildId)
+    return { supportChannelId: config.labSupportChannelId, minRoleId: config.labMinRoleId };
+  throw new Error('Server is not configured.');
+}

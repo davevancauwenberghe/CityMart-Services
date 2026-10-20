@@ -30,6 +30,23 @@ Administrative actions are restricted to the configured Discord server's owner. 
 
 `/ask` defaults to a public answer. Set `private:true` to keep both the answer and its continuations visible only to you. The authenticated Hall v2 Worker keeps up to 12 exchanges and expires them after 24 hours of inactivity, including across bot restarts. Context is separated by your account, server, channel and public/private reply mode. `reset:true` deletes that context before asking. `/forget` deletes your public Hall context in this channel; `/forget private:true` deletes private context. Both confirmations are private. This does not delete Discord posts or provider security logs. Do not send secrets to the AI. The bot does not keep a second transcript in its own memory.
 
+## Add an optional labs server
+
+Keep `GUILD_ID` set to the existing CityMart server. Invite the **same bot application** to your labs server before enabling it, using a Discord guild-install link with `bot` and `applications.commands` scopes. Grant View Channel, Send Messages, Embed Links, Attach Files, Read Message History and Send Messages in Threads where needed. Administrator is unnecessary.
+
+In the existing Coolify application's **production runtime Environment Variables**, add `LAB_GUILD_ID` with your labs server's ID. It can be marked as a secret in Coolify; disable build-time availability, save and redeploy. Keep the existing bot token, Hall secrets and `/data` volume. The bot verifies access to both servers and registers the full slash-command list in each before becoming ready. An invalid or inaccessible configured server blocks startup, so invite the bot first.
+
+Optional labs-only settings:
+
+- `LAB_SUPPORT_CHANNEL_ID`: a support channel **in labs**. Unset shows a message to contact that server's team, without a production channel link.
+- `LAB_GIVEAWAY_MIN_ROLE_ID`: a minimum participation role **in labs**. Unset allows all human members in labs. A configured role that is missing blocks entries. The production minimum role is never reused in labs.
+
+Giveaway creation, entries, lists, autocomplete, owner actions, scheduled draws and winner support links use the current server. Only that server's owner can manage its giveaways. Hall memory already separates server, channel, member and public/private reply mode; `/forget` affects only the selected context in the current server. Whitelist forms remain bound to their requester and server.
+
+Startup announcements and Roblox community-size updates continue to use the primary server's `GENERAL_CHANNEL_ID` and `COMMANDS_CHANNEL_ID`. Both servers share this one running bot, code version and configured live integrations; labs is not a separate deployment or a mock environment. Use a separate bot application and Coolify deployment if you need an experimental code version independent of production.
+
+To disable labs, remove all three `LAB_*` settings and redeploy. Existing giveaway records are retained, and scheduling for the removed server stops. Previously registered commands may remain visible there until the bot is removed, but requests are rejected.
+
 ## Upgrade from 1.4.0 to 1.4.1
 
 1. Deploy this release using your existing Hall connection and `/data` volume. No new secret or data migration is required for this update; the Hall secrets required since 1.4.0 remain required.
@@ -73,27 +90,30 @@ The bot connects outward to Discord; it needs no publicly accessible HTTP endpoi
 
 Set variables in Coolify's **production Environment Variables**, available **at runtime**, with build-time availability disabled. Mark credentials as secrets. `NODE_ENV=production` is already set by the Docker image; the separate build stage installs the TypeScript build tools.
 
-| Variable                  | Purpose                                                                                 |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `DISCORD_TOKEN`           | Required bot token.                                                                     |
-| `GUILD_ID`                | Required CityMart Discord server ID.                                                    |
-| `CLIENT_ID`               | Optional bot application ID; required only for manual registration.                     |
-| `SUPPORT_CHANNEL_ID`      | Support links and giveaway winner claim links.                                          |
-| `GENERAL_CHANNEL_ID`      | Optional startup announcement channel.                                                  |
-| `COMMANDS_CHANNEL_ID`     | Optional Roblox community size update channel.                                          |
-| `ROBLOX_GROUP_ID`         | Roblox community ID; defaults to `36060455`.                                            |
-| `GIVEAWAY_MIN_ROLE_ID`    | Optional minimum participation role. Unset means all human members may enter.           |
-| `HALLAI_API_KEY`          | Secret matching the Hall Worker’s `DISCORD_API_KEY`; required for `/ask` and `/forget`. |
-| `WORKER_URL`              | HTTPS Hall v2 origin, e.g. `https://hall.davevancauwenberghe.be`.                       |
-| `EASYPOS_TOKEN`           | Activity API token.                                                                     |
-| `CITYCRAFT_OWNER_USER_ID` | Optional request recipient; defaults to the existing Dave account `651525636351066182`. |
-| `CITYCRAFT_STATUS_HOST`   | Status connection target; defaults to `157.173.101.60`.                                 |
-| `CITYCRAFT_STATUS_PORT`   | Status connection port; defaults to `25565`.                                            |
-| `CITYCRAFT_ADDRESS`       | Defaults to `citycraft.davevancauwenberghe.be`.                                         |
-| `TIME_ZONE`               | Giveaway date input zone; defaults to `Europe/Brussels`.                                |
-| `DATA_DIR`                | Writable persistent directory; defaults to `/data`.                                     |
-| `PORT`                    | Internal health port; defaults to `8080`.                                               |
-| `USER_AGENT`              | Optional outbound API identification string.                                            |
+| Variable                   | Purpose                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`            | Required bot token.                                                                     |
+| `LAB_GUILD_ID`             | Optional additional labs Discord server ID; unset keeps single-server behavior.         |
+| `LAB_SUPPORT_CHANNEL_ID`   | Optional labs-only support channel; never falls back to production.                     |
+| `LAB_GIVEAWAY_MIN_ROLE_ID` | Optional labs-only minimum role; unset allows all human labs members.                   |
+| `GUILD_ID`                 | Required primary CityMart Discord server ID.                                            |
+| `CLIENT_ID`                | Optional bot application ID; required only for manual registration.                     |
+| `SUPPORT_CHANNEL_ID`       | Support links and giveaway winner claim links.                                          |
+| `GENERAL_CHANNEL_ID`       | Optional startup announcement channel.                                                  |
+| `COMMANDS_CHANNEL_ID`      | Optional Roblox community size update channel.                                          |
+| `ROBLOX_GROUP_ID`          | Roblox community ID; defaults to `36060455`.                                            |
+| `GIVEAWAY_MIN_ROLE_ID`     | Optional minimum participation role. Unset means all human members may enter.           |
+| `HALLAI_API_KEY`           | Secret matching the Hall Worker’s `DISCORD_API_KEY`; required for `/ask` and `/forget`. |
+| `WORKER_URL`               | HTTPS Hall v2 origin, e.g. `https://hall.davevancauwenberghe.be`.                       |
+| `EASYPOS_TOKEN`            | Activity API token.                                                                     |
+| `CITYCRAFT_OWNER_USER_ID`  | Optional request recipient; defaults to the existing Dave account `651525636351066182`. |
+| `CITYCRAFT_STATUS_HOST`    | Status connection target; defaults to `157.173.101.60`.                                 |
+| `CITYCRAFT_STATUS_PORT`    | Status connection port; defaults to `25565`.                                            |
+| `CITYCRAFT_ADDRESS`        | Defaults to `citycraft.davevancauwenberghe.be`.                                         |
+| `TIME_ZONE`                | Giveaway date input zone; defaults to `Europe/Brussels`.                                |
+| `DATA_DIR`                 | Writable persistent directory; defaults to `/data`.                                     |
+| `PORT`                     | Internal health port; defaults to `8080`.                                               |
+| `USER_AGENT`               | Optional outbound API identification string.                                            |
 
 Missing optional integration credentials produce a helpful embed instead of crashing the bot. Invalid configured IDs, URLs or time zones stop startup. Give the bot View Channel, Send Messages, Embed Links and Read Message History in relevant channels, plus Send Messages in Threads where applicable. Administrator and Manage Roles are not needed. Whitelist-request delivery and giveaway winner DMs depend on the recipient allowing DMs.
 

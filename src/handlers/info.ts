@@ -7,7 +7,7 @@ import {
   type Client,
 } from 'discord.js';
 import type { Config } from '../config.js';
-import { VERSION } from '../config.js';
+import { VERSION, guildSettings } from '../config.js';
 import { UserError } from '../core.js';
 import { embed, links, respond, literal, clip } from '../ui.js';
 import type { Roblox } from '../services/roblox.js';
@@ -97,26 +97,28 @@ export async function info(
         },
       ),
     ]);
-  if (command === 'support')
+  if (command === 'support') {
+    const { supportChannelId } = guildSettings(config, interaction.guildId!);
     return respond(
       interaction,
       [
         embed(
           'CityMart support',
-          config.supportChannelId
-            ? `Need a hand? Visit <#${config.supportChannelId}> and tell the team what happened. Please keep passwords and tokens private.`
+          supportChannelId
+            ? `Need a hand? Visit <#${supportChannelId}> and tell the team what happened. Please keep passwords and tokens private.`
             : 'Please contact the server’s moderation team for help.',
         ),
       ],
-      config.supportChannelId
+      supportChannelId
         ? [
             links([
               'Open support',
-              `https://discord.com/channels/${config.guildId}/${config.supportChannelId}`,
+              `https://discord.com/channels/${interaction.guildId}/${supportChannelId}`,
             ]),
           ]
         : [],
     );
+  }
   if (command === 'communitycount') {
     const count = await roblox.count();
     return respond(
@@ -143,7 +145,7 @@ export async function info(
     const member = await interaction.guild!.members.fetch(user.id).catch(() => null);
     if (!member) throw new UserError('That user is not a member of this server.');
     const roles = member.roles.cache
-      .filter((role) => role.id !== config.guildId)
+      .filter((role) => role.id !== interaction.guildId)
       .sort((a, b) => b.position - a.position)
       .map((role) => `<@&${role.id}>`);
     return respond(
