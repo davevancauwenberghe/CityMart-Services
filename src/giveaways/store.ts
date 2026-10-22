@@ -1,4 +1,4 @@
-import { open, rename, mkdir, readFile, copyFile, unlink, chmod, stat } from 'node:fs/promises';
+import { open, rename, mkdir, copyFile, unlink, chmod } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomInt, randomUUID } from 'node:crypto';
 import { isSnowflake } from '../config.js';
@@ -118,9 +118,22 @@ export class GiveawayStore {
     await mkdir(dirname(this.file), { recursive: true, mode: 0o700 });
     let source: string;
     try {
-      if ((await stat(this.file)).size > 20 * 1024 * 1024)
-        throw new Error('Giveaway file exceeds 20 MiB.');
-      source = await readFile(this.file, 'utf8');
+      const handle = await open(this.file, 'r');
+      try {
+        const maxBytes = 20 * 1024 * 1024;
+        if ((await handle.stat()).size > maxBytes) throw new Error('Giveaway file exceeds 20 MiB.');
+        // Use the checked handle, and read at most one byte beyond the limit to detect growth.
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        for await (const chunk of handle.createReadStream({ autoClose: false, end: maxBytes })) {
+          bytes += chunk.length;
+          if (bytes > maxBytes) throw new Error('Giveaway file exceeds 20 MiB.');
+          chunks.push(chunk);
+        }
+        source = Buffer.concat(chunks, bytes).toString('utf8');
+      } finally {
+        await handle.close();
+      }
     } catch (error) {
       if (object(error).code === 'ENOENT') {
         await this.persist(this.file, JSON.stringify(this.data));

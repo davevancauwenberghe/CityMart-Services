@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 export function createHealthServer(isReady: () => boolean) {
   const server = createServer((request, response) => {
-    let status = 200;
+    let status: number;
     let payload: Record<string, string>;
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       status = 405;
